@@ -45,6 +45,9 @@ public class Order extends BaseTimeEntity {
     @Column(name = "order_token")
     private String orderToken;
 
+    @Column(name = "order_qr", columnDefinition = "TEXT")
+    private String orderQR;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -52,7 +55,7 @@ public class Order extends BaseTimeEntity {
     private Payment payment;
 
     @Builder
-    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer totalAmount, String recipientName, String orderToken) {
+    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer totalAmount, String recipientName, String orderToken, String orderQR) {
         this.orderId = orderId;
         this.userId = userId;
         this.storeId = storeId;
@@ -60,6 +63,7 @@ public class Order extends BaseTimeEntity {
         this.totalAmount = totalAmount;
         this.recipientName = recipientName;
         this.orderToken = orderToken;
+        this.orderQR = orderQR;
     }
 
     /**
@@ -103,5 +107,12 @@ public class Order extends BaseTimeEntity {
      */
     public void setPayment(Payment payment) {
         this.payment = payment;
+    }
+
+    /**
+     * Set order QR code
+     */
+    public void setOrderQR(String orderQR) {
+        this.orderQR = orderQR;
     }
 } 

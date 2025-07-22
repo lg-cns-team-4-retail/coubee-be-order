@@ -46,7 +46,7 @@ public class OrderListResponse {
         @Schema(description = "Order creation time", example = "2023-06-01T14:30:00")
         private LocalDateTime createdAt;
 
-        @Schema(description = "Order name (First product + N more)", example = "Men's T-shirt and 2 more")
+        @Schema(description = "Order name (First product + N more)", example = "테스트 상품 1 외 1건")
         private String orderName;
 
         /**

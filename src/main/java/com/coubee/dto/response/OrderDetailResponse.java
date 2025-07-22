@@ -10,6 +10,7 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 @Builder
 public class OrderDetailResponse {
 
-    @Schema(description = "Order ID", example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
+    @Schema(description = "Order ID", example = "order_b7833686f25b48e0862612345678abcd")
     private String orderId;
 
     @Schema(description = "User ID", example = "1")
@@ -31,14 +32,17 @@ public class OrderDetailResponse {
     @Schema(description = "Order status", example = "PAID")
     private OrderStatus status;
 
-    @Schema(description = "Total order amount", example = "25000")
+    @Schema(description = "Total order amount", example = "200")
     private Integer totalAmount;
 
-    @Schema(description = "Recipient name", example = "John Doe")
+    @Schema(description = "Recipient name", example = "홍길동")
     private String recipientName;
 
     @Schema(description = "Order token (QR/barcode)", example = "abcdef123456")
     private String orderToken;
+
+    @Schema(description = "Order QR code (Base64)", example = "b3JkZXJfYjc4MzM2ODZmMjViNDhlMDg2MjYxMjM0NTY3OGFiY2Q=")
+    private String orderQR;
 
     @Schema(description = "Order creation time", example = "2023-06-01T14:30:00")
     private LocalDateTime createdAt;
@@ -59,16 +63,16 @@ public class OrderDetailResponse {
         @Schema(description = "Product ID", example = "1")
         private Long productId;
 
-        @Schema(description = "Product name", example = "Men's T-shirt")
+        @Schema(description = "Product name", example = "테스트 상품 1")
         private String productName;
 
         @Schema(description = "Order quantity", example = "2")
         private Integer quantity;
 
-        @Schema(description = "Product price", example = "12500")
+        @Schema(description = "Product price", example = "100")
         private Integer price;
 
-        @Schema(description = "Total product price", example = "25000")
+        @Schema(description = "Total product price", example = "200")
         private Integer totalPrice;
 
         /**
@@ -128,12 +132,32 @@ public class OrderDetailResponse {
                     .paymentId(payment.getPaymentId())
                     .pgProvider(payment.getPgProvider())
                     .pgTransactionId(payment.getPgTransactionId())
-                    .method(payment.getMethod())
+                    .method(mapToDisplayPayMethod(payment.getMethod()))
                     .amount(payment.getAmount())
                     .status(payment.getStatus().name())
                     .paidAt(payment.getPaidAt())
                     .receiptUrl(payment.getReceiptUrl())
                     .build();
+        }
+
+        /**
+         * 간편결제 수단을 'EASY-PAY' 카테고리로 매핑하는 헬퍼 메서드
+         * @param originalMethod DB에 저장된 원본 결제 수단
+         * @return 화면 표시용 결제 수단 (EASY-PAY 또는 원본값)
+         */
+        private static String mapToDisplayPayMethod(String originalMethod) {
+            if (originalMethod == null) {
+                return null;
+            }
+            
+            Set<String> easyPayMethods = Set.of("KAKAOPAY", "TOSSPAY", "PAYCO");
+            
+            if (easyPayMethods.contains(originalMethod.toUpperCase())) {
+                return "EASY-PAY";
+            }
+            
+            // 간편결제가 아닌 경우(예: 'CARD')는 원래 값을 그대로 반환
+            return originalMethod;
         }
     }
 
@@ -153,6 +177,7 @@ public class OrderDetailResponse {
                 .totalAmount(order.getTotalAmount())
                 .recipientName(order.getRecipientName())
                 .orderToken(order.getOrderToken())
+                .orderQR(order.getOrderQR())
                 .createdAt(order.getCreatedAt())
                 .items(items)
                 .payment(PaymentResponse.from(order.getPayment()))

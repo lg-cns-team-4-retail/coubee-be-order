@@ -50,18 +50,25 @@ public class PaymentWebhookController {
     @PostMapping("/webhook")
     public ResponseEntity<String> handlePaymentWebhookV2(
             HttpServletRequest request,
-            @RequestBody String requestBody) {
+            @RequestBody(required = false) String requestBody,
+            @RequestParam(required = false) String paymentId) {
         
         // 웹훅 헤더 추출
         String signature = request.getHeader("x-portone-signature");
         String timestamp = request.getHeader("x-portone-request-timestamp");
         String userAgent = request.getHeader("User-Agent");
         
-        log.info("PortOne V2 웹훅 수신 - IP: {}, User-Agent: {}", 
-            getClientIpAddress(request), userAgent);
+        log.info("PortOne V2 웹훅 수신 - IP: {}, User-Agent: {}, PaymentId: {}", 
+            getClientIpAddress(request), userAgent, paymentId);
         
         try {
-            // 1. 필수 헤더 검증
+            // 쿼리 파라미터로 paymentId가 전달된 경우 (테스트 환경)
+            if (paymentId != null && !paymentId.isEmpty()) {
+                log.info("쿼리 파라미터로 paymentId 수신: {}", paymentId);
+                return processPaymentIdWebhook(paymentId);
+            }
+            
+            // 1. 필수 헤더 검증 (실제 PortOne 웹훅)
             if (signature == null || timestamp == null) {
                 log.warn("웹훅 필수 헤더 누락 - signature: {}, timestamp: {}", 
                     signature != null ? "있음" : "없음", 
@@ -147,6 +154,30 @@ public class PaymentWebhookController {
         }
         
         return request.getRemoteAddr();
+    }
+    
+    /**
+     * PaymentId를 통한 간단한 웹훅 처리 (테스트용)
+     */
+    private ResponseEntity<String> processPaymentIdWebhook(String paymentId) {
+        try {
+            log.info("PaymentId 웹훅 처리 시작: {}", paymentId);
+            
+            // 결제 서비스 호출하여 결제 상태 업데이트
+            boolean result = paymentService.handlePaymentWebhook(paymentId);
+            
+            if (result) {
+                log.info("PaymentId 웹훅 처리 성공: {}", paymentId);
+                return ResponseEntity.ok("success");
+            } else {
+                log.warn("PaymentId 웹훅 처리 실패: {}", paymentId);
+                return ResponseEntity.ok("processing_failed");
+            }
+            
+        } catch (Exception e) {
+            log.error("PaymentId 웹훅 처리 중 오류: {}", paymentId, e);
+            return ResponseEntity.ok("processing_error");
+        }
     }
     
     /**

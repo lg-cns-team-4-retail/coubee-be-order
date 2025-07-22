@@ -22,7 +22,7 @@ public class OrderCreateRequest {
     @NotNull(message = "Store ID is required")
     private Long storeId;
 
-    @Schema(description = "Recipient name", example = "John Doe")
+    @Schema(description = "Recipient name", example = "홍길동")
     @NotBlank(message = "Recipient name is required")
     private String recipientName;
 

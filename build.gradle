@@ -57,6 +57,10 @@ dependencies {
     
     // H2 Database
     runtimeOnly 'com.h2database:h2'
+    
+    // QR Code generation
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'com.google.zxing:javase:3.5.3'
 
     // Flyway
     implementation 'org.flywaydb:flyway-core'

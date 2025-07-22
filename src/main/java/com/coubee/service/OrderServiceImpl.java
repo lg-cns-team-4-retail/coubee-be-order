@@ -3,7 +3,6 @@ package com.coubee.service;
 import com.coubee.client.PortOneClient;
 import com.coubee.client.ProductServiceClient;
 import com.coubee.client.dto.request.PortOnePaymentCancelRequest;
-import com.coubee.client.dto.request.PortOnePaymentRequest;
 import com.coubee.client.dto.request.ProductIdsRequest;
 import com.coubee.client.dto.response.PortOnePaymentCancelResponse;
 import com.coubee.client.dto.response.PortOnePaymentResponse;
@@ -14,6 +13,7 @@ import com.coubee.domain.OrderStatus;
 import com.coubee.domain.Payment;
 import com.coubee.dto.request.OrderCancelRequest;
 import com.coubee.dto.request.OrderCreateRequest;
+import com.coubee.dto.request.PaymentReadyRequest;
 import com.coubee.dto.response.OrderCreateResponse;
 import com.coubee.dto.response.OrderDetailResponse;
 import com.coubee.dto.response.OrderListResponse;
@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -47,16 +48,22 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final ProductServiceClient productServiceClient;
     private final PortOneClient portOneClient;
+    private final PaymentService paymentService;
+    private final QrCodeService qrCodeService;
     private final OrderKafkaProducer kafkaProducer;
 
     @Autowired
     public OrderServiceImpl(OrderRepository orderRepository, 
                            ProductServiceClient productServiceClient, 
-                           PortOneClient portOneClient, 
+                           PortOneClient portOneClient,
+                           PaymentService paymentService,
+                           QrCodeService qrCodeService,
                            @Autowired(required = false) OrderKafkaProducer kafkaProducer) {
         this.orderRepository = orderRepository;
         this.productServiceClient = productServiceClient;
         this.portOneClient = portOneClient;
+        this.paymentService = paymentService;
+        this.qrCodeService = qrCodeService;
         this.kafkaProducer = kafkaProducer;
     }
 
@@ -86,7 +93,7 @@ public class OrderServiceImpl implements OrderService {
                 .map(productId -> ProductDetailResponse.builder()
                         .id(productId)
                         .name("테스트 상품 " + productId)
-                        .price(10000)
+                        .price(100)
                         .stock(100)
                         .active(true)
                         .build())
@@ -123,13 +130,23 @@ public class OrderServiceImpl implements OrderService {
             orderName += " 외 " + (request.getItems().size() - 1) + "건";
         }
 
-        // 4. 주문 ID 생성
-        String orderId = "order_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+        // 4. 주문 ID 생성 (order_ + 전체 UUID)
+        String orderId = "order_" + UUID.randomUUID().toString().replace("-", "");
 
         // 5. 주문 엔티티 생성
         Order order = Order.createOrder(orderId, userId, request.getStoreId(), totalAmount, request.getRecipientName());
+        
+        // 6. QR 코드 토큰 생성 (orderId를 Base64로 인코딩)
+        try {
+            String qrToken = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(orderId.getBytes());
+            order.setOrderToken(qrToken);
+            log.info("QR 토큰 생성 완료: {} -> {}", orderId, qrToken);
+        } catch (Exception e) {
+            log.warn("QR 토큰 생성 실패: {}", orderId, e);
+            // QR 토큰 생성 실패해도 주문 생성은 계속 진행
+        }
 
-        // 6. 주문 아이템 엔티티 생성 및 주문에 추가
+        // 7. 주문 아이템 엔티티 생성 및 주문에 추가
         for (OrderCreateRequest.OrderItemRequest item : request.getItems()) {
             ProductDetailResponse product = productMap.get(item.getProductId());
             OrderItem orderItem = OrderItem.createOrderItem(
@@ -142,34 +159,45 @@ public class OrderServiceImpl implements OrderService {
             order.addOrderItem(orderItem);
         }
 
-        // 7. 결제 엔티티 생성
+        // 8. 결제 엔티티 생성
         Payment payment = Payment.createPayment(
                 orderId, // 결제 ID로 주문 ID 사용
                 order,
-                request.getPaymentMethod(),
+                request.getPaymentMethod(), // 원본 결제 수단 그대로 저장
                 totalAmount
         );
 
-        // 8. 주문 저장 (Cascade 설정으로 OrderItem, Payment 함께 저장)
+        // 9. 주문 저장 (Cascade 설정으로 OrderItem, Payment 함께 저장)
         orderRepository.save(order);
 
-        // 9. 포트원에 결제 정보 등록 (사전 등록) - 오류 처리 추가
-        try {
-            PortOnePaymentRequest portOneRequest = PortOnePaymentRequest.builder()
-                    .paymentId(orderId) // 결제 ID로 주문 ID 사용
-                    .amount(totalAmount)
-                    .orderName(orderName)
-                    .buyerName(request.getRecipientName())
-                    .build();
+        // 10. 결제 서비스를 통한 PortOne 결제 정보 사전 등록 (조건부 호출로 변경)
+        
+        // 사전 등록을 지원하는 결제 수단 목록 (토스페이, 페이코는 사전 등록 미지원)
+        final Set<String> methodsSupportingPrepare = Set.of("CARD", "KAKAOPAY");
+        
+        String paymentMethod = request.getPaymentMethod();
 
-            portOneClient.preparePayment(portOneRequest);
-            log.info("PortOne 결제 사전 등록 성공: {}", orderId);
-        } catch (Exception e) {
-            log.warn("PortOne 결제 사전 등록 실패: {} - {}", orderId, e.getMessage());
-            // 결제 사전 등록 실패해도 주문은 계속 진행
+        // 토스페이, 페이코처럼 사전 등록을 지원하지 않는 결제수단은 이 단계를 건너뜀
+        if (methodsSupportingPrepare.contains(paymentMethod.toUpperCase())) {
+            try {
+                // PaymentReadyRequest는 storeId와 items를 받지만, preparePayment에서는 orderId로 조회하므로 더미 데이터 사용
+                List<PaymentReadyRequest.Item> items = request.getItems().stream()
+                        .map(item -> new PaymentReadyRequest.Item(item.getProductId(), item.getQuantity()))
+                        .collect(Collectors.toList());
+                
+                PaymentReadyRequest paymentReadyRequest = new PaymentReadyRequest(request.getStoreId(), items);
+                
+                paymentService.preparePayment(orderId, paymentReadyRequest);
+                log.info("결제 준비 완료 (사전 등록): {}", orderId);
+            } catch (Exception e) {
+                log.warn("결제 준비(사전 등록) 실패: {} - {}", orderId, e.getMessage());
+                // 결제 준비 실패해도 주문은 계속 진행 (결제 시 재시도 가능)
+            }
+        } else {
+            log.info("결제 수단 '{}' 은 사전 등록을 지원하지 않습니다. 사전 등록 단계를 건너뜁니다: {}", paymentMethod, orderId);
         }
 
-        // 10. 재고 감소 이벤트 발행 (Kafka)
+        // 11. 재고 감소 이벤트 발행 (Kafka)
         if (kafkaProducer != null) {
             List<StockDecreaseEvent.StockItem> stockItems = request.getItems().stream()
                     .map(item -> StockDecreaseEvent.StockItem.builder()
@@ -186,7 +214,7 @@ public class OrderServiceImpl implements OrderService {
             kafkaProducer.sendStockDecreaseEvent(stockEvent);
         }
 
-        // 11. 응답 생성
+        // 12. 응답 생성
         return OrderCreateResponse.builder()
                 .orderId(orderId)
                 .paymentId(orderId) // 결제 ID로 주문 ID 사용
@@ -306,4 +334,5 @@ public class OrderServiceImpl implements OrderService {
         
         return OrderDetailResponse.from(order);
     }
+
 } 

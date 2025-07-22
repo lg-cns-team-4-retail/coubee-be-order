@@ -8,7 +8,7 @@ spring:
   profiles:
     active: dev
   application:
-    name: coubee-order-service
+    name: coubee-be-order
   
   # HTTP encoding settings
   http:

@@ -65,4 +65,4 @@ java -jar build/libs/coubee-order-payment-service-0.0.1-SNAPSHOT.jar
 ## 외부 서비스 연동
 
 - **PortOne**: 결제 처리를 위한 PG 서비스
-- **Product Service**: 상품 정보 조회를 위한 내부 서비스 
+- **Product Service**: 상품 정보 조회를 위한 내부 서비스

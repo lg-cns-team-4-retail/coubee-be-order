@@ -1,6 +1,7 @@
 package com.coubee.service;
 
 import com.coubee.client.PortOneClient;
+import com.coubee.client.dto.request.PortOnePaymentRequest;
 import com.coubee.client.dto.response.PortOnePaymentResponse;
 import com.coubee.domain.Order;
 import com.coubee.domain.OrderStatus;
@@ -50,9 +51,65 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     public PaymentReadyResponse preparePayment(String orderId, PaymentReadyRequest request) {
-        // 구현 필요
-        return null; 
+        try {
+            log.info("Preparing payment for orderId: {}", orderId);
+            
+            // 1. 주문 정보 조회
+            Order order = orderRepository.findByOrderId(orderId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+            
+            // 2. 결제 정보 조회 (주문 생성 시 이미 생성됨)
+            Payment payment = order.getPayment();
+            if (payment == null) {
+                throw new IllegalStateException("Payment not found for order: " + orderId);
+            }
+            
+            // 3. 주문명 생성 (첫 번째 상품명 + 외 N건)
+            String orderName = "Order " + orderId;
+            if (!order.getItems().isEmpty()) {
+                orderName = order.getItems().get(0).getProductName();
+                if (order.getItems().size() > 1) {
+                    orderName += " 외 " + (order.getItems().size() - 1) + "건";
+                }
+            }
+            
+            // 4. PortOne에 결제 정보 사전 등록 (실제 환경에서만 호출)
+            try {
+                PortOnePaymentRequest portOneRequest = PortOnePaymentRequest.builder()
+                        .paymentId(payment.getPaymentId())
+                        .amount(payment.getAmount())
+                        .orderName(orderName)
+                        .buyerName(order.getRecipientName())
+                        .build();
+                
+                PortOnePaymentResponse portOneResponse = portOneClient.preparePayment(portOneRequest);
+                
+                if (portOneResponse != null) {
+                    log.info("PortOne payment preparation successful for orderId: {}", orderId);
+                } else {
+                    log.warn("PortOne payment preparation returned null response for orderId: {}", orderId);
+                }
+                
+            } catch (Exception e) {
+                // PortOne API 호출 실패 시 로그만 남기고 계속 진행 (테스트 환경 고려)
+                log.warn("PortOne payment preparation failed for orderId: {} - Error: {}", orderId, e.getMessage());
+                log.info("Continuing with order creation despite PortOne preparation failure (test mode)");
+            }
+            
+            // 5. 응답 생성 (기존 DTO 구조에 맞춤)
+            return PaymentReadyResponse.of(
+                    order.getRecipientName(),  // buyerName
+                    orderName,                 // name
+                    payment.getAmount(),       // amount
+                    payment.getPaymentId()     // merchantUid
+            );
+            
+        } catch (Exception e) {
+            log.error("Error preparing payment for orderId: {}", orderId, e);
+            throw new IllegalStateException("Payment preparation failed: " + e.getMessage());
+        }
     }
     
     /**
@@ -87,16 +144,32 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public boolean handlePaymentWebhook(String paymentId) {
         try {
-            // 1. Get payment info from PortOne (Important: Direct query from PortOne server, not from client)
-            PortOnePaymentResponse portOnePayment = verifyPayment(paymentId);
+            log.info("Processing payment webhook for paymentId: {}", paymentId);
             
-            // 2. Get payment info
+            // 1. Get payment info from database
             Payment payment = paymentRepository.findByPaymentId(paymentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Payment not found: " + paymentId));
             
             Order order = payment.getOrder();
             if (order == null) {
                 log.error("No order linked to payment: {}", paymentId);
+                return false;
+            }
+            
+            log.info("Found payment: {} with status: {}", paymentId, payment.getStatus());
+            
+            // 2. Get payment info from PortOne (실제 결제 상태 확인)
+            PortOnePaymentResponse portOnePayment;
+            try {
+                portOnePayment = verifyPayment(paymentId);
+                log.info("PortOne payment status: {}", portOnePayment != null ? portOnePayment.getStatus() : "null");
+            } catch (Exception e) {
+                log.error("Failed to verify payment from PortOne: {}", paymentId, e);
+                return false;
+            }
+            
+            if (portOnePayment == null) {
+                log.error("PortOne payment not found: {}", paymentId);
                 return false;
             }
             
@@ -112,23 +185,27 @@ public class PaymentServiceImpl implements PaymentService {
             
             if ("paid".equalsIgnoreCase(status)) {
                 // Payment success
+                log.info("Processing successful payment: {}", paymentId);
                 completePayment(payment, order, portOnePayment);
                 return true;
             } else if ("failed".equalsIgnoreCase(status)) {
                 // Payment failed
+                log.warn("Processing failed payment: {}", paymentId);
                 failPayment(payment, order, portOnePayment.getFailReason());
                 return false;
             } else if ("cancelled".equalsIgnoreCase(status)) {
                 // Payment cancelled
+                log.warn("Processing cancelled payment: {}", paymentId);
                 cancelPayment(payment, order, "Cancelled by PortOne");
                 return false;
             } else {
                 // Other status
-                log.warn("Unhandled payment status: {}", status);
+                log.warn("Unhandled payment status: {} for paymentId: {}", status, paymentId);
                 return false;
             }
+            
         } catch (Exception e) {
-            log.error("Error processing payment webhook", e);
+            log.error("Error processing payment webhook for paymentId: {}", paymentId, e);
             return false;
         }
     }
@@ -155,6 +232,16 @@ public class PaymentServiceImpl implements PaymentService {
                 portOnePayment.getPaidAt(),
                 portOnePayment.getReceiptUrl()
         );
+        
+        // Generate and save orderQR (orderId encoded to Base64)
+        try {
+            String orderQR = java.util.Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(order.getOrderId().getBytes("UTF-8"));
+            order.setOrderQR(orderQR);
+            log.info("OrderQR generated for orderId: {} -> {}", order.getOrderId(), orderQR);
+        } catch (Exception e) {
+            log.error("Failed to generate orderQR for orderId: {}", order.getOrderId(), e);
+        }
         
         // Order status update (handled automatically in Payment entity)
         
