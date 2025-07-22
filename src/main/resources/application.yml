@@ -1,0 +1,121 @@
+server:
+  port: 8083
+  servlet:
+    context-path: /
+  shutdown: graceful
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: coubee-order-service
+  
+  # HTTP encoding settings
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  
+  # Servlet multipart settings
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  
+  # Messages encoding
+  messages:
+    encoding: UTF-8
+  
+  # 데이터베이스 설정 (H2 메모리 DB)
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        default_batch_fetch_size: 100
+    database-platform: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+  
+  # Flyway 비활성화
+  flyway:
+    enabled: false
+  
+  # Kafka 설정 - 테스트용 비활성화
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    enabled: false
+
+# Eureka 설정 - 비활성화
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+# PortOne V2 API 설정
+portone:
+  api:
+    url: https://api.portone.io
+    version: v2
+  v2:
+    store-id: "store-a9463375-7b07-40fc-8c4f-e0bd4fb0c2b7"
+    api-secret: "zncFiBtA0lilnsWsTaBUgepbSSp7YYbXFOvI62d9jJ3RfEpM9Tjqr3ikg1BRyUM6DFmXrAwZ43ryLamW"
+    webhook-secret: "whsec_IzOsJT0hX+AC8m86APWxn2tLfVbOkZ+dV0xZ/Q0RnE4="
+  # Legacy V1 설정 (호환성)
+  legacy:
+    imp-key: ${PORTONE_IMP_KEY:test_key}
+    imp-secret: ${PORTONE_IMP_SECRET:test_secret}
+
+# Logging 설정
+logging:
+  level:
+    com.coubee: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springdoc: DEBUG
+
+# Actuator 설정
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      
+# Swagger 설정
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+  model-and-view-allowed: true
+  remove-broken-reference-definitions: true
+
+# H2 콘솔 활성화
+spring.h2.console:
+  enabled: true
+  path: /h2-console
+
+# CORS Configuration
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:8080,http://localhost:5173,http://127.0.0.1:5500,http://localhost:5500,file:// 

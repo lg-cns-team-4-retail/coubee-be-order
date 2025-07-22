@@ -1,0 +1,15 @@
+spring:
+  config:
+    activate:
+      on-profile: 'docker,prod'
+  application:
+    name: coubee-order-payment-service
+  cloud:
+    config:
+      uri: ${CONFIG_SERVER_URI:http://localhost:8888}
+      fail-fast: true
+      retry:
+        max-attempts: 20
+        initial-interval: 1500
+        multiplier: 1.5
+        max-interval: 10000 
