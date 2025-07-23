@@ -2,9 +2,11 @@ package com.coubee.service;
 
 import com.coubee.dto.request.OrderCancelRequest;
 import com.coubee.dto.request.OrderCreateRequest;
+import com.coubee.dto.request.OrderStatusUpdateRequest;
 import com.coubee.dto.response.OrderCreateResponse;
 import com.coubee.dto.response.OrderDetailResponse;
 import com.coubee.dto.response.OrderListResponse;
+import com.coubee.dto.response.OrderStatusUpdateResponse;
 import org.springframework.data.domain.Pageable;
 
 /**
@@ -46,4 +48,21 @@ public interface OrderService {
      * @return Cancelled order details
      */
     OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request);
+
+    /**
+     * Mark an order as received
+     *
+     * @param orderId Order ID
+     * @return Received order details
+     */
+    OrderDetailResponse receiveOrder(String orderId);
+
+    /**
+     * Update order status manually
+     *
+     * @param orderId Order ID
+     * @param request Order status update request
+     * @return Updated order status information
+     */
+    OrderStatusUpdateResponse updateOrderStatus(String orderId, OrderStatusUpdateRequest request);
 } 

@@ -57,8 +57,7 @@ portone:
       # 각 결제 수단별 채널 키 (환경 변수로 주입 가능) - 모든 키를 소문자로 통일
       card: ${PORTONE_CHANNEL_KEY_TOSSPAYMENTS:channel-key-a448c12c-9f97-4eeb-9506-97279641dbf9}
       kakaopay: ${PORTONE_CHANNEL_KEY_KAKAOPAY:channel-key-e19a56d4-1583-46c6-a37f-19944df75a35}
-      tosspay: ${PORTONE_CHANNEL_KEY_TOSSPAY:channel-key-aaea2e9f-efec-4565-9619-0173d51cc4a6}
-      payco: ${PORTONE_CHANNEL_KEY_PAYCO:channel-key-401582f6-2c72-479e-a04b-2a68f1d09afe}
+      tosspay: ${PORTONE_CHANNEL_KEY_TOSSPAY:channel-key-375e06c6-e99f-4563-a94a-04a3752d0243}
 # Logging 설정
 logging:
   level:

@@ -13,7 +13,7 @@ public enum OrderStatus {
     PAID("Paid"),
     PREPARING("Preparing"),
     PREPARED("Prepared"),
-    COMPLETED("Completed"),
+    RECEIVED("Received"),
     CANCELLED("Cancelled"),
     FAILED("Failed");
 

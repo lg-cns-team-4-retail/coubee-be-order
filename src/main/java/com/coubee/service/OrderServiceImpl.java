@@ -13,10 +13,12 @@ import com.coubee.domain.OrderStatus;
 import com.coubee.domain.Payment;
 import com.coubee.dto.request.OrderCancelRequest;
 import com.coubee.dto.request.OrderCreateRequest;
+import com.coubee.dto.request.OrderStatusUpdateRequest;
 import com.coubee.dto.request.PaymentReadyRequest;
 import com.coubee.dto.response.OrderCreateResponse;
 import com.coubee.dto.response.OrderDetailResponse;
 import com.coubee.dto.response.OrderListResponse;
+import com.coubee.dto.response.OrderStatusUpdateResponse;
 import com.coubee.exception.ResourceNotFoundException;
 import com.coubee.kafka.producer.OrderKafkaProducer;
 import com.coubee.kafka.producer.notification.event.NotificationEvent;
@@ -333,6 +335,97 @@ public class OrderServiceImpl implements OrderService {
         }
         
         return OrderDetailResponse.from(order);
+    }
+
+    /**
+     * 주문을 수령 완료 상태로 변경합니다.
+     *
+     * @param orderId 주문 ID
+     * @return 수령 완료된 주문 상세 정보 DTO
+     */
+    @Override
+    @Transactional
+    public OrderDetailResponse receiveOrder(String orderId) {
+        // 1. 주문 정보 조회
+        Order order = orderRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+
+        // 2. 주문 수령 가능 상태인지 확인
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new IllegalStateException("Order cannot be received in status: " + order.getStatus());
+        }
+
+        // 3. 주문 상태를 RECEIVED로 업데이트
+        order.updateStatus(OrderStatus.RECEIVED);
+
+        // 4. 알림 이벤트 발행 (Kafka)
+        if (kafkaProducer != null) {
+            Map<String, String> notificationData = new HashMap<>();
+            notificationData.put("orderId", orderId);
+            notificationData.put("orderStatus", OrderStatus.RECEIVED.name());
+            
+            NotificationEvent notificationEvent = NotificationEvent.builder()
+                    .userId(order.getUserId())
+                    .title("Order Received")
+                    .body("Your order has been received")
+                    .type("ORDER_RECEIVED")
+                    .data(notificationData)
+                    .build();
+    
+            kafkaProducer.sendNotificationEvent(notificationEvent);
+        }
+
+        return OrderDetailResponse.from(order);
+    }
+
+    /**
+     * 주문 상태를 수동으로 변경합니다. (관리자용)
+     *
+     * @param orderId 주문 ID
+     * @param request 주문 상태 변경 요청 DTO
+     * @return 주문 상태 변경 응답 DTO
+     */
+    @Override
+    @Transactional
+    public OrderStatusUpdateResponse updateOrderStatus(String orderId, OrderStatusUpdateRequest request) {
+        // 1. 주문 정보 조회
+        Order order = orderRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+
+        // 2. 이전 상태 저장
+        OrderStatus previousStatus = order.getStatus();
+        
+        // 3. 새로운 상태로 업데이트
+        order.updateStatus(request.getStatus());
+        
+        // 4. 변경사항 저장
+        orderRepository.save(order);
+
+        // 5. 상태 변경 알림 이벤트 발행 (Kafka)
+        if (kafkaProducer != null) {
+            Map<String, String> notificationData = new HashMap<>();
+            notificationData.put("orderId", orderId);
+            notificationData.put("previousStatus", previousStatus.name());
+            notificationData.put("currentStatus", request.getStatus().name());
+            
+            NotificationEvent notificationEvent = NotificationEvent.builder()
+                    .userId(order.getUserId())
+                    .title("Order Status Updated")
+                    .body("Your order status has been changed to " + request.getStatus())
+                    .type("ORDER_STATUS_UPDATED")
+                    .data(notificationData)
+                    .build();
+    
+            kafkaProducer.sendNotificationEvent(notificationEvent);
+        }
+
+        // 6. 응답 생성
+        return OrderStatusUpdateResponse.builder()
+                .orderId(orderId)
+                .previousStatus(previousStatus)
+                .currentStatus(request.getStatus())
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 
 } 

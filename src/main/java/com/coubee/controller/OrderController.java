@@ -2,10 +2,12 @@ package com.coubee.controller;
 
 import com.coubee.dto.request.OrderCancelRequest;
 import com.coubee.dto.request.OrderCreateRequest;
+import com.coubee.dto.request.OrderStatusUpdateRequest;
 import com.coubee.dto.response.ApiResponse;
 import com.coubee.dto.response.OrderCreateResponse;
 import com.coubee.dto.response.OrderDetailResponse;
 import com.coubee.dto.response.OrderListResponse;
+import com.coubee.dto.response.OrderStatusUpdateResponse;
 import com.coubee.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -98,5 +100,37 @@ public class OrderController {
             @Valid @RequestBody OrderCancelRequest request) {
         OrderDetailResponse response = orderService.cancelOrder(orderId, request);
         return ApiResponse.success("Order has been cancelled", response);
+    }
+
+    /**
+     * Receive Order API
+     *
+     * @param orderId Order ID
+     * @return Received order details
+     */
+    @Operation(summary = "Receive Order", description = "Marks an order as received by the customer")
+    @PostMapping("/orders/{orderId}/receive")
+    public ApiResponse<OrderDetailResponse> receiveOrder(
+            @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
+            @PathVariable String orderId) {
+        OrderDetailResponse response = orderService.receiveOrder(orderId);
+        return ApiResponse.success("Order has been received", response);
+    }
+
+    /**
+     * Update Order Status API (Manual)
+     *
+     * @param orderId Order ID
+     * @param request Order status update request
+     * @return Updated order status information
+     */
+    @Operation(summary = "Update Order Status", description = "Manually updates order status (Admin only)")
+    @PatchMapping("/orders/{orderId}")
+    public ApiResponse<OrderStatusUpdateResponse> updateOrderStatus(
+            @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
+            @PathVariable String orderId,
+            @Valid @RequestBody OrderStatusUpdateRequest request) {
+        OrderStatusUpdateResponse response = orderService.updateOrderStatus(orderId, request);
+        return ApiResponse.success("Order status has been updated", response);
     }
 } 
