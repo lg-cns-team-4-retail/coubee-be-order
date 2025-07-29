@@ -32,7 +32,7 @@ public class OrderController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponseDto<OrderCreateResponse> createOrder(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-ID") Long userId,
+            @RequestHeader("X-Auth-UserId") Long userId,
             @Valid @RequestBody OrderCreateRequest request) {
         OrderCreateResponse response = orderService.createOrder(userId, request);
         return ApiResponseDto.createOk(response);
