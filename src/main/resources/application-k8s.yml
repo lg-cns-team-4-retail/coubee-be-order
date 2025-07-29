@@ -1,0 +1,57 @@
+# Kubernetes 환경 전용 설정
+spring:
+  application:
+    name: coubee-be-order
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+        all-namespaces: false
+        namespaces: 
+          - default
+      config:
+        enabled: false
+      reload:
+        enabled: true
+      loadbalancer:
+        enabled: true
+        mode: SERVICE
+  datasource:
+    url: ${JDBC_URL}
+    username: ${JDBC_USERNAME}
+    password: ${JDBC_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+server:
+  port: 8080
+
+# Logging 설정
+logging:
+  level:
+    com.coubee: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: INFO
+
+# PortOne API 설정
+portone:
+  api:
+    url: https://api.portone.io
+  v2:
+    store-id: ${PORTONE_STORE_ID}
+    api-secret: ${PORTONE_API_SECRET}
+    webhook-secret: ${PORTONE_WEBHOOK_SECRET}
+    channels:
+      card: ${PORTONE_CHANNEL_KEY_TOSSPAYMENTS}
+      kakaopay: ${PORTONE_CHANNEL_KEY_KAKAOPAY}
+      tosspay: ${PORTONE_CHANNEL_KEY_TOSSPAY} 

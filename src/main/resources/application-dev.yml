@@ -6,6 +6,11 @@ spring:
     config:
       # Spring Cloud Config 클라이언트 기능을 비활성화합니다.
       enabled: false
+    kubernetes:
+      discovery:
+        enabled: true
+      config:
+        enabled: false
   
   # H2 메모리 데이터베이스 설정
   datasource:
@@ -33,17 +38,6 @@ spring:
 
 server:
   port: 8083
-
-# Eureka 설정
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka
-    register-with-eureka: true
-    fetch-registry: true
-  instance:
-    prefer-ip-address: true
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
 
 # PortOne API 설정
 portone:

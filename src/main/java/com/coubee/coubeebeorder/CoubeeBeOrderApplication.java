@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.kafka.annotation.EnableKafka;
 
 @SpringBootApplication
-@EnableDiscoveryClient
+@EnableDiscoveryClient // Kubernetes에서도 사용되는 동일한 어노테이션
 @EnableFeignClients
 @EnableJpaAuditing
 @EnableKafka
