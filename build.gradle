@@ -13,11 +13,6 @@ java {
     }
 }
 
-// UTF-8 인코딩 설정 추가
-tasks.withType(JavaCompile) {
-    options.encoding = 'UTF-8'
-}
-
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
@@ -41,9 +36,10 @@ dependencies {
     // implementation 'org.springframework.boot:spring-boot-starter-security'
     
     // Spring Cloud
-    implementation 'org.springframework.cloud:spring-cloud-starter-kubernetes-client-all'
+    // implementation 'org.springframework.cloud:spring-cloud-starter-kubernetes-client-all'
     // implementation 'org.springframework.cloud:spring-cloud-starter-config'
     // implementation 'org.springframework.cloud:spring-cloud-starter-bootstrap'
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
     implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
     
@@ -93,9 +89,9 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     
     // WireMock
-    testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-stub-runner'
-    testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-verifier'
-    testImplementation 'org.wiremock:wiremock-standalone:3.0.1'
+    // testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-stub-runner'
+    // testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-verifier'
+    // testImplementation 'org.wiremock:wiremock-standalone:3.0.1'
     
     
     // Embedded Kafka
@@ -107,22 +103,8 @@ dependencyManagement {
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
     }
 }
-
-// 테스트 설정 - 임시로 비활성화 (테스트 구현 불완전)
 tasks.named('test') {
     useJUnitPlatform()
-    enabled = false
-}
-
-// 테스트 컴파일 비활성화
-tasks.named('compileTestJava') {
-    enabled = false
-}
-
-// bootRun 설정 추가
-bootRun {
-    standardInput = System.in
-    jvmArgs = ["-Dspring.config.additional-location=file:../config.properties"]
 }
 
 jar {
