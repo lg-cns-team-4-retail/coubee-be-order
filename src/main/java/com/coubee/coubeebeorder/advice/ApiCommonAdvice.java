@@ -43,11 +43,11 @@ public class ApiCommonAdvice {
 
     @ExceptionHandler(NotFound.class)
     public ResponseEntity<ApiResponseDto<String>> handleNotFound(NotFound ex) {
-        log.warn("Not found error: {}", ex.getMessage());
+        log.warn("Not found error: {}", ex.getErrorMessage());
         
         ApiResponseDto<String> response = ApiResponseDto.createError(
-            ex.getApiError().getCode(),
-            ex.getMessage()
+            ex.getErrorCode(),
+            ex.getErrorMessage()
         );
         
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
@@ -55,11 +55,11 @@ public class ApiCommonAdvice {
 
     @ExceptionHandler(BadParameter.class)
     public ResponseEntity<ApiResponseDto<String>> handleBadParameter(BadParameter ex) {
-        log.warn("Bad parameter error: {}", ex.getMessage());
+        log.warn("Bad parameter error: {}", ex.getErrorMessage());
         
         ApiResponseDto<String> response = ApiResponseDto.createError(
-            ex.getApiError().getCode(),
-            ex.getMessage()
+            ex.getErrorCode(),
+            ex.getErrorMessage()
         );
         
         return ResponseEntity.badRequest().body(response);
@@ -67,11 +67,11 @@ public class ApiCommonAdvice {
 
     @ExceptionHandler(ClientError.class)
     public ResponseEntity<ApiResponseDto<String>> handleClientError(ClientError ex) {
-        log.warn("Client error: {}", ex.getMessage());
+        log.warn("Client error: {}", ex.getErrorMessage());
         
         ApiResponseDto<String> response = ApiResponseDto.createError(
-            ex.getApiError().getCode(),
-            ex.getMessage()
+            ex.getErrorCode(),
+            ex.getErrorMessage()
         );
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);

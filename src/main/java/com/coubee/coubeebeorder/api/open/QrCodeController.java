@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/open/qr")
+@RequestMapping("/api/order/qr")
 @RequiredArgsConstructor
 @Tag(name = "QR Code", description = "QR 코드 생성 API")
 public class QrCodeController {

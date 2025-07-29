@@ -1,6 +1,7 @@
 package com.coubee.coubeebeorder.api.open;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import com.coubee.coubeebeorder.config.PortOneProperties;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyRequest;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyResponse;
 import com.coubee.coubeebeorder.service.PaymentService;
@@ -13,14 +14,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @Slf4j
 @RestController
-@RequestMapping("/api/open/payment")
+@RequestMapping("/api/order/payment")
 @RequiredArgsConstructor
 @Tag(name = "Payment", description = "결제 관련 API")
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final PortOneProperties portOneProperties;
 
     @PostMapping("/orders/{orderId}/prepare")
     @Operation(summary = "결제 준비", description = "주문에 대한 결제를 준비합니다.")
@@ -49,5 +53,21 @@ public class PaymentController {
         Object response = paymentService.getPaymentStatus(paymentId);
         
         return ResponseEntity.ok(ApiResponseDto.readOk(response));
+    }
+
+    @GetMapping("/config")
+    @Operation(summary = "결제 설정 정보 조회", description = "PortOne 설정 정보를 제공합니다.")
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> getPaymentConfig() {
+        
+        log.info("결제 설정 정보 조회 요청");
+        
+        Map<String, Object> config = Map.of(
+            "storeId", portOneProperties.getStoreId(),
+            "channelKeys", portOneProperties.getChannels()
+        );
+        
+        log.info("결제 설정 정보 응답 - Store ID: {}", portOneProperties.getStoreId());
+        
+        return ResponseEntity.ok(ApiResponseDto.readOk(config));
     }
 }

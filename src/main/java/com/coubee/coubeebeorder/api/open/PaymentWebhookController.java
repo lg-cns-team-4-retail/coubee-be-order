@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/open/webhook")
+@RequestMapping("/api/order/webhook")
 @RequiredArgsConstructor
 @Tag(name = "Payment Webhook", description = "결제 웹훅 API")
 public class PaymentWebhookController {

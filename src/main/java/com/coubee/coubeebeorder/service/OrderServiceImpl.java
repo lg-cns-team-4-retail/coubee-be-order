@@ -40,7 +40,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Getting order details for: {}", orderId);
         
         // TODO: Implement order retrieval logic
-        throw new NotFound(ApiError.NOT_FOUND);
+        throw new NotFound("주문을 찾을 수 없습니다.");
     }
 
     @Override
@@ -67,7 +67,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Cancelling order: {} with reason: {}", orderId, request.getCancelReason());
         
         // TODO: Implement order cancellation logic
-        throw new NotFound(ApiError.NOT_FOUND);
+        throw new NotFound("주문을 찾을 수 없습니다.");
     }
 
     @Override
@@ -76,7 +76,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Marking order as received: {}", orderId);
         
         // TODO: Implement order receive logic
-        throw new NotFound(ApiError.NOT_FOUND);
+        throw new NotFound("주문을 찾을 수 없습니다.");
     }
 
     @Override

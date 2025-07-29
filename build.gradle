@@ -52,8 +52,8 @@ dependencies {
     implementation 'io.github.resilience4j:resilience4j-spring-boot3'
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
     
-    // MySQL
-    runtimeOnly 'com.mysql:mysql-connector-j'
+    // PostgreSQL
+    runtimeOnly 'org.postgresql:postgresql'
     
     // H2 Database
     runtimeOnly 'com.h2database:h2'
