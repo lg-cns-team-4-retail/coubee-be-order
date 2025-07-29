@@ -5,14 +5,15 @@
 -- =================================================================================
 
 -- 1. Orders 테이블에 새로운 컬럼들 추가
-ALTER TABLE orders 
-ADD COLUMN store_id BIGINT NOT NULL DEFAULT 1 COMMENT '매장 ID',
-ADD COLUMN recipient_name VARCHAR(255) NOT NULL DEFAULT 'Unknown' COMMENT '수령인 이름',
-ADD COLUMN order_token VARCHAR(255) NULL COMMENT '주문 토큰 (QR/바코드용)',
-ADD COLUMN order_qr TEXT NULL COMMENT '주문 QR 코드 (Base64)';
+ALTER TABLE orders
+ADD COLUMN store_id BIGINT NOT NULL DEFAULT 1,
+ADD COLUMN recipient_name VARCHAR(255) NOT NULL DEFAULT 'Unknown',
+ADD COLUMN order_token VARCHAR(255) NULL,
+ADD COLUMN order_qr TEXT NULL;
 
 -- 2. Orders 테이블 컬럼명 변경: order_status → status
-ALTER TABLE orders CHANGE COLUMN order_status status VARCHAR(20) NOT NULL;
+ALTER TABLE orders RENAME COLUMN order_status TO status;
+ALTER TABLE orders ALTER COLUMN status TYPE VARCHAR(20);
 
 -- 3. 불필요한 컬럼들 제거
 ALTER TABLE orders DROP COLUMN IF EXISTS shipping_address;
@@ -22,21 +23,24 @@ ALTER TABLE orders DROP COLUMN IF EXISTS shipping_memo;
 CREATE INDEX idx_store_id ON orders (store_id);
 
 -- =================================================================================
--- Payments 테이블 구조 변경  
+-- Payments 테이블 구조 변경
 -- =================================================================================
 
 -- 5. Payments 테이블에 새로운 컬럼들 추가
-ALTER TABLE payments 
-ADD COLUMN store_id BIGINT NULL COMMENT '매장 ID',
-ADD COLUMN method VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN' COMMENT '결제 수단',
-ADD COLUMN failed_at DATETIME NULL COMMENT '결제 실패 시각',
-ADD COLUMN canceled_at DATETIME NULL COMMENT '결제 취소 시각';
+ALTER TABLE payments
+ADD COLUMN store_id BIGINT NULL,
+ADD COLUMN method VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN',
+ADD COLUMN failed_at TIMESTAMP NULL,
+ADD COLUMN canceled_at TIMESTAMP NULL;
 
 -- 6. Payments 테이블 컬럼명 변경: payment_status → status
-ALTER TABLE payments CHANGE COLUMN payment_status status VARCHAR(20) NOT NULL;
+ALTER TABLE payments RENAME COLUMN payment_status TO status;
+ALTER TABLE payments ALTER COLUMN status TYPE VARCHAR(20);
 
--- 7. Payments 테이블 컬럼명 변경: pg_tid → pg_transaction_id  
-ALTER TABLE payments CHANGE COLUMN pg_tid pg_transaction_id VARCHAR(100);
+-- 7. Payments 테이블 컬럼명 변경: pg_tid → pg_transaction_id
+ALTER TABLE payments RENAME COLUMN pg_tid TO pg_transaction_id;
+ALTER TABLE payments ALTER COLUMN pg_transaction_id TYPE VARCHAR(100);
+
 
 -- 8. Payments 테이블 인덱스 추가
 CREATE INDEX idx_payments_store_id ON payments (store_id);
