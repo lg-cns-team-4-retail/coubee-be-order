@@ -1,15 +1,7 @@
 spring:
   application:
     name: coubee-be-order
-  flyway:
-    enabled: false
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    show-sql: true
-  h2:
-    console:
-      enabled: true
+
   kafka:
     listener:
       ack-mode: manual_immediate
@@ -29,31 +21,21 @@ spring:
       properties:
         spring.json.add.type.headers: false
 
-server:
-  port: 8083
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
-
 # PortOne API 설정
-portone:
-  api:
-    url: api.iamport.kr
-  v2:
-    store-id: ${PORTONE_STORE_ID:test_store}
-    channel-key: ${PORTONE_CHANNEL_KEY:test_channel}
-    webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_webhook}
+# portone:
+#   api:
+#     url: api.iamport.kr
+#   v2:
+#     store-id: ${PORTONE_STORE_ID:test_store}
+#     channel-key: ${PORTONE_CHANNEL_KEY:test_channel}
+#     webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_webhook}
 
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      show-details: always 
+# management:
+#   endpoints:
+#     web:
+#       exposure:
+#         include: health,info,metrics,prometheus
+#   endpoint:
+#     health:
+#       show-details: always 

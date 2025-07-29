@@ -38,7 +38,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     // implementation 'org.springframework.boot:spring-boot-starter-security'
     
     // Spring Cloud
@@ -49,8 +48,8 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
     
     // Circuit Breaker
-    implementation 'io.github.resilience4j:resilience4j-spring-boot3'
-    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
+    // implementation 'io.github.resilience4j:resilience4j-spring-boot3'
+    // implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
     
     // PostgreSQL
     runtimeOnly 'org.postgresql:postgresql'
@@ -77,8 +76,8 @@ dependencies {
     implementation 'io.github.cdimascio:dotenv-java:2.2.0'
 
     // Tracing & Monitoring
-    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-    implementation 'io.opentelemetry:opentelemetry-exporter-zipkin'
+    // implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    // implementation 'io.opentelemetry:opentelemetry-exporter-zipkin'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
