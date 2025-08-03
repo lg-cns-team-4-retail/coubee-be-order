@@ -26,11 +26,7 @@ public class GlobalExceptionHandler {
         errorDetails.put("toStatus", ex.getToStatus());
         errorDetails.put("timestamp", LocalDateTime.now());
         
-        ApiResponseDto<Object> response = ApiResponseDto.builder()
-                .success(false)
-                .message(ex.getMessage())
-                .data(errorDetails)
-                .build();
+        ApiResponseDto<Object> response = ApiResponseDto.createError("INVALID_STATUS_TRANSITION", ex.getMessage(), errorDetails);
                 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
@@ -42,11 +38,7 @@ public class GlobalExceptionHandler {
         Map<String, Object> errorDetails = new HashMap<>();
         errorDetails.put("timestamp", LocalDateTime.now());
         
-        ApiResponseDto<Object> response = ApiResponseDto.builder()
-                .success(false)
-                .message(ex.getMessage())
-                .data(errorDetails)
-                .build();
+        ApiResponseDto<Object> response = ApiResponseDto.createError("NOT_FOUND", ex.getMessage(), errorDetails);
                 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
@@ -58,11 +50,7 @@ public class GlobalExceptionHandler {
         Map<String, Object> errorDetails = new HashMap<>();
         errorDetails.put("timestamp", LocalDateTime.now());
         
-        ApiResponseDto<Object> response = ApiResponseDto.builder()
-                .success(false)
-                .message(ex.getMessage())
-                .data(errorDetails)
-                .build();
+        ApiResponseDto<Object> response = ApiResponseDto.createError("FORBIDDEN", ex.getMessage(), errorDetails);
                 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
@@ -82,11 +70,7 @@ public class GlobalExceptionHandler {
         errorDetails.put("validationErrors", validationErrors);
         errorDetails.put("timestamp", LocalDateTime.now());
         
-        ApiResponseDto<Object> response = ApiResponseDto.builder()
-                .success(false)
-                .message("Validation failed")
-                .data(errorDetails)
-                .build();
+        ApiResponseDto<Object> response = ApiResponseDto.createError("VALIDATION_FAILED", "Validation failed", errorDetails);
                 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
@@ -98,11 +82,7 @@ public class GlobalExceptionHandler {
         Map<String, Object> errorDetails = new HashMap<>();
         errorDetails.put("timestamp", LocalDateTime.now());
         
-        ApiResponseDto<Object> response = ApiResponseDto.builder()
-                .success(false)
-                .message("An unexpected error occurred")
-                .data(errorDetails)
-                .build();
+        ApiResponseDto<Object> response = ApiResponseDto.createError("INTERNAL_SERVER_ERROR", "An unexpected error occurred", errorDetails);
                 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }

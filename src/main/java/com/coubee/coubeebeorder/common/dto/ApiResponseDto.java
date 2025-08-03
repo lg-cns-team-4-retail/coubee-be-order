@@ -1,29 +1,50 @@
 package com.coubee.coubeebeorder.common.dto;
 
+import lombok.Builder;
 import lombok.Getter;
 
 @Getter
+@Builder
 public class ApiResponseDto<T> {
     private String code;
     private String message;
     private T data;
+    private boolean success;
 
     private ApiResponseDto(String code, String message) {
         this.code = code;
         this.message = message;
+        this.success = "OK".equals(code);
     }
 
     private ApiResponseDto(String code, String message, T data) {
         this.code = code;
         this.message = message;
         this.data = data;
+        this.success = "OK".equals(code);
+    }
+
+    private ApiResponseDto(String code, String message, T data, boolean success) {
+        this.code = code;
+        this.message = message;
+        this.data = data;
+        this.success = success;
     }
 
     public static <T> ApiResponseDto<T> createOk(T data) {
         return new ApiResponseDto<>("OK", "데이터 생성 요청이 성공하였습니다.", data);
     }
+
     public static <T> ApiResponseDto<T> readOk(T data) {
         return new ApiResponseDto<>("OK", "데이터 조회 요청이 성공하였습니다.", data);
+    }
+
+    public static <T> ApiResponseDto<T> updateOk(T data) {
+        return new ApiResponseDto<>("OK", "데이터 수정 요청이 성공하였습니다.", data);
+    }
+
+    public static <T> ApiResponseDto<T> updateOk(T data, String message) {
+        return new ApiResponseDto<>("OK", message, data);
     }
 
     public static ApiResponseDto<String> defaultOk() {
