@@ -6,6 +6,7 @@ import com.coubee.coubeebeorder.domain.dto.OrderCreateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderCreateResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderDetailResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
+import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
 import com.coubee.coubeebeorder.service.OrderService;
@@ -47,6 +48,15 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
+    @Operation(summary = "Get Order Status", description = "Retrieves the current status of an order by order ID")
+    @GetMapping("/orders/status/{orderId}")
+    public ApiResponseDto<OrderStatusResponse> getOrderStatus(
+            @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
+            @PathVariable String orderId) {
+        OrderStatusResponse response = orderService.getOrderStatus(orderId);
+        return ApiResponseDto.readOk(response);
+    }
+
     @Operation(summary = "Get User Orders", description = "Retrieves order list by user ID")
     @GetMapping("/users/{userId}/orders")
     public ApiResponseDto<OrderListResponse> getUserOrders(
@@ -80,13 +90,23 @@ public class OrderController {
         return ApiResponseDto.createOk(response);
     }
 
-    @Operation(summary = "Update Order Status", description = "Manually updates order status (Admin only)")
+    @Operation(summary = "Update Order Status", description = "Updates order status (Store owners only)")
     @PatchMapping("/orders/{orderId}")
     public ApiResponseDto<OrderStatusUpdateResponse> updateOrderStatus(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
             @PathVariable String orderId,
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
+            @Parameter(description = "User role from authentication", hidden = true)
+            @RequestHeader("X-Auth-Role") String userRole,
             @Valid @RequestBody OrderStatusUpdateRequest request) {
-        OrderStatusUpdateResponse response = orderService.updateOrderStatus(orderId, request);
-        return ApiResponseDto.createOk(response);
+
+        // Validate user has permission to update order status
+        if (!"STORE_OWNER".equals(userRole) && !"ADMIN".equals(userRole)) {
+            throw new IllegalArgumentException("Only store owners and admins can update order status");
+        }
+
+        OrderStatusUpdateResponse response = orderService.updateOrderStatus(orderId, request, userId);
+        return ApiResponseDto.updateOk(response, "Order status has been updated");
     }
 }

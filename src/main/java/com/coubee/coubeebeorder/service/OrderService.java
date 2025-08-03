@@ -5,6 +5,7 @@ import com.coubee.coubeebeorder.domain.dto.OrderCreateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderCreateResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderDetailResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
+import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
 import org.springframework.data.domain.Pageable;
@@ -15,11 +16,13 @@ public interface OrderService {
 
     OrderDetailResponse getOrder(String orderId);
 
+    OrderStatusResponse getOrderStatus(String orderId);
+
     OrderListResponse getUserOrders(Long userId, Pageable pageable);
 
     OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request);
 
     OrderDetailResponse receiveOrder(String orderId);
 
-    OrderStatusUpdateResponse updateOrderStatus(String orderId, OrderStatusUpdateRequest request);
+    OrderStatusUpdateResponse updateOrderStatus(String orderId, OrderStatusUpdateRequest request, Long userId);
 }
