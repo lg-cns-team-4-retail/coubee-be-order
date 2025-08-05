@@ -5,7 +5,7 @@ spring:
   cloud:
     kubernetes:
       discovery:
-        enabled: true
+        enabled: false
         all-namespaces: false
         namespaces: 
           - default
@@ -14,7 +14,7 @@ spring:
       reload:
         enabled: true
       loadbalancer:
-        enabled: true
+        enabled: false
         mode: SERVICE
   datasource:
     url: ${JDBC_URL}
