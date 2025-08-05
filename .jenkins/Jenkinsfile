@@ -97,8 +97,8 @@ pipeline {
                     docker.withRegistry("", DOCKERHUB_CREDENTIAL) {
                         docker.image("${DOCKER_IMAGE_NAME}").push()
                     }
-
-                    sh "docker rmi ${DOCKER_IMAGE_NAME}"
+        
+                    sh "docker rmi -f ${DOCKER_IMAGE_NAME} || true"
                 }
             }
         }
