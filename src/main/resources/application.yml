@@ -44,8 +44,15 @@ management:
       show-details: always
       probes:
         enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState
   health:
     livenessstate:
       enabled: true
     readinessstate:
       enabled: true
+  server:
+    port: 8080
