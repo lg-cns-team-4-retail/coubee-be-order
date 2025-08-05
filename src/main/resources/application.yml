@@ -32,12 +32,20 @@ spring:
 #     channel-key: ${PORTONE_CHANNEL_KEY:test_channel}
 #     webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_webhook}
 
-
-# management:
-#   endpoints:
-#     web:
-#       exposure:
-#         include: health,info,metrics,prometheus
-#   endpoint:
-#     health:
-#       show-details: always 
+# Enable management endpoints for Kubernetes health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /api
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
