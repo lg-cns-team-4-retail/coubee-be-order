@@ -1,20 +1,17 @@
-package com.coubee.coubeebeorder.config;
-
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    // Gateway handles CORS, but adding basic CORS support for direct service access during development
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOriginPatterns("*")
+                // 와일드카드(*) 대신 정확한 출처를 명시합니다.
+                .allowedOrigins(
+                        "http://localhost:5501", 
+                        "https://coubee-api.murkui.com"
+                )
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(true)
+                .allowCredentials(true) // .allowedOrigins()와 함께 사용하면 안전합니다.
                 .maxAge(3600);
     }
 }
