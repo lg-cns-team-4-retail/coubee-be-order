@@ -1,8 +1,10 @@
 package com.coubee.coubeebeorder.api.open;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.service.PaymentService;
 import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +22,7 @@ public class PaymentWebhookController {
 
     private final PaymentService paymentService;
     private final PortOneWebhookVerifier webhookVerifier;
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/portone")
     @Operation(summary = "PortOne 웹훅", description = "PortOne에서 전송하는 결제 완료 웹훅을 처리합니다.")
@@ -28,14 +31,26 @@ public class PaymentWebhookController {
             @Parameter(description = "웹훅 서명")
             @RequestHeader(value = "X-IamPort-Signature", required = false) String signature,
             @Parameter(description = "웹훅 타임스탬프")  
-            @RequestHeader(value = "X-IamPort-Timestamp", required = false) String timestamp,
-            @Parameter(description = "결제 ID")
-            @RequestParam(value = "imp_uid", required = false) String paymentId) {
+            @RequestHeader(value = "X-IamPort-Timestamp", required = false) String timestamp) {
         
-        log.info("PortOne 웹훅 수신 - 결제 ID: {}", paymentId);
+        log.info("PortOne 웹훅 수신");
         log.debug("웹훅 요청 본문: {}", requestBody);
         
         try {
+            // JSON 본문을 DTO로 파싱하여 결제 ID 추출
+            PortoneWebhookPayload payload;
+            String paymentId;
+            try {
+                payload = objectMapper.readValue(requestBody, PortoneWebhookPayload.class);
+                paymentId = payload.getImpUid();
+                log.info("웹훅 페이로드 파싱 완료 - 결제 ID: {}, 상태: {}, 주문 ID: {}", 
+                        paymentId, payload.getStatus(), payload.getMerchantUid());
+            } catch (Exception e) {
+                log.error("웹훅 페이로드 파싱 실패", e);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponseDto.createError("INVALID_PAYLOAD", "웹훅 페이로드 형식이 올바르지 않습니다."));
+            }
+            // 웹훅 서명 검증 (원본 requestBody 사용)
             if (webhookVerifier.isWebhookSecretConfigured()) {
                 boolean isValidSignature = webhookVerifier.verifyWebhook(requestBody, signature, timestamp);
                 if (!isValidSignature) {
