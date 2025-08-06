@@ -36,20 +36,17 @@ public class PaymentWebhookController {
         log.info("PortOne 웹훅 수신");
         log.debug("웹훅 요청 본문: {}", requestBody);
         
+        // ✅✅✅ 변수를 메소드 최상단에서 선언하고 초기화합니다. ✅✅✅
+        String paymentId = "unknown"; 
+        
         try {
             // JSON 본문을 DTO로 파싱하여 결제 ID 추출
-            PortoneWebhookPayload payload;
-            String paymentId;
-            try {
-                payload = objectMapper.readValue(requestBody, PortoneWebhookPayload.class);
-                paymentId = payload.getImpUid();
-                log.info("웹훅 페이로드 파싱 완료 - 결제 ID: {}, 상태: {}, 주문 ID: {}", 
-                        paymentId, payload.getStatus(), payload.getMerchantUid());
-            } catch (Exception e) {
-                log.error("웹훅 페이로드 파싱 실패", e);
-                return ResponseEntity.badRequest()
-                        .body(ApiResponseDto.createError("INVALID_PAYLOAD", "웹훅 페이로드 형식이 올바르지 않습니다."));
-            }
+            PortoneWebhookPayload payload = objectMapper.readValue(requestBody, PortoneWebhookPayload.class);
+            paymentId = payload.getImpUid(); // ⬅️ 이제 여기서 값을 재할당합니다.
+            
+            log.info("웹훅 페이로드 파싱 완료 - 결제 ID: {}, 상태: {}, 주문 ID: {}", 
+                    paymentId, payload.getStatus(), payload.getMerchantUid());
+
             // 웹훅 서명 검증 (원본 requestBody 사용)
             if (webhookVerifier.isWebhookSecretConfigured()) {
                 boolean isValidSignature = webhookVerifier.verifyWebhook(requestBody, signature, timestamp);
@@ -81,6 +78,7 @@ public class PaymentWebhookController {
             }
             
         } catch (Exception e) {
+            // ✅ 이제 이 catch 블록에서도 paymentId 변수에 접근할 수 있습니다.
             log.error("웹훅 처리 중 예외 발생 - 결제 ID: " + paymentId, e);
             return ResponseEntity.internalServerError()
                     .body(ApiResponseDto.createError("INTERNAL_SERVER_ERROR", "웹훅 처리 중 내부 오류가 발생했습니다."));
