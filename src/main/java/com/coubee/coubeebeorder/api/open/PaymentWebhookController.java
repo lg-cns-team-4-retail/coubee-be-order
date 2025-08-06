@@ -32,8 +32,9 @@ public class PaymentWebhookController {
             @RequestHeader(value = "X-IamPort-Signature", required = false) String signature,
             @Parameter(description = "웹훅 타임스탬프")  
             @RequestHeader(value = "X-IamPort-Timestamp", required = false) String timestamp) {
-        
+                
         log.info("PortOne 웹훅 수신");
+        log.info("PortOne Webhook Received - Raw Body: {}", requestBody);
         log.debug("웹훅 요청 본문: {}", requestBody);
         
         // ✅✅✅ 변수를 메소드 최상단에서 선언하고 초기화합니다. ✅✅✅
