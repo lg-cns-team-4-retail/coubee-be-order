@@ -155,15 +155,15 @@ public class OrderServiceImpl implements OrderService {
         if (order.getPayment() != null && order.getPayment().getStatus() == PaymentStatus.PAID) {
             try {
                 PortOnePaymentCancelRequest cancelRequest = PortOnePaymentCancelRequest.builder()
-                        .impUid(order.getPayment().getPgTransactionId())
-                        .merchantUid(orderId)
+                        .imp_uid(order.getPayment().getPgTransactionId())
+                        .merchant_uid(orderId)
                         .amount(order.getTotalAmount())
                         .reason(request.getCancelReason())
                         .build();
                 
                 PortOnePaymentCancelResponse cancelResponse = portOneClient.cancelPayment(cancelRequest);
                 
-                if (cancelResponse.isSuccess()) {
+                if ("0".equals(cancelResponse.getCode())) {
                     order.getPayment().updateCancelledStatus();
                     log.info("Payment cancelled successfully for order: {}", orderId);
                 } else {
@@ -187,13 +187,12 @@ public class OrderServiceImpl implements OrderService {
                     .eventType("STOCK_INCREASE")
                     .orderId(orderId)
                     .userId(order.getUserId())
-                    .storeId(order.getStoreId())
                     .items(order.getItems().stream()
                             .map(item -> OrderEvent.OrderItemEvent.builder()
                                     .productId(item.getProductId())
                                     .quantity(item.getQuantity())
                                     .build())
-                            .collect(Collectors.toList()))
+                            .toList())
                     .build();
             
             kafkaMessageProducer.publishOrderEvent(stockIncreaseEvent);
@@ -309,14 +308,13 @@ public class OrderServiceImpl implements OrderService {
                 .payment(order.getPayment() != null ? 
                         OrderDetailResponse.PaymentResponse.builder()
                                 .paymentId(order.getPayment().getPaymentId())
+                                .pgProvider(order.getPayment().getPgProvider())
                                 .method(order.getPayment().getMethod())
                                 .amount(order.getPayment().getAmount())
-                                .status(order.getPayment().getStatus())
+                                .status(order.getPayment().getStatus().name())
                                 .paidAt(order.getPayment().getPaidAt())
-                                .receiptUrl(order.getPayment().getReceiptUrl())
                                 .build() : null)
                 .createdAt(order.getCreatedAt())
-                .updatedAt(order.getUpdatedAt())
                 .build();
     }
     
@@ -326,7 +324,6 @@ public class OrderServiceImpl implements OrderService {
                 .storeId(order.getStoreId())
                 .status(order.getStatus())
                 .totalAmount(order.getTotalAmount())
-                .recipientName(order.getRecipientName())
                 .orderName(generateOrderName(order.getItems()))
                 .createdAt(order.getCreatedAt())
                 .build();

@@ -45,7 +45,7 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = Payment.createPayment(
                 orderId, // Using orderId as paymentId
                 order,
-                request.getPaymentMethod(),
+                "card", // Default payment method since PaymentReadyRequest doesn't specify method
                 order.getTotalAmount()
         );
         
@@ -59,9 +59,9 @@ public class PaymentServiceImpl implements PaymentService {
         // Optional: Call PortOne prepare API for amount verification
         try {
             PortOnePaymentRequest portOneRequest = PortOnePaymentRequest.builder()
-                    .merchantUid(orderId)
+                    .paymentId(orderId)
                     .amount(order.getTotalAmount())
-                    .name(generateOrderName(order))
+                    .orderName(generateOrderName(order))
                     .buyerName(order.getRecipientName())
                     .build();
             
@@ -89,7 +89,7 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             // Call PortOne API to get payment information
             PortOnePaymentResponse response = portOneClient.getPayment(paymentId);
-            log.info("Payment status retrieved from PortOne: paymentId={}, status={}", paymentId, response.getStatus());
+            log.info("Payment status retrieved from PortOne: paymentId={}, status={}", paymentId, response.getResponse().getStatus());
             return response;
         } catch (Exception e) {
             log.error("Failed to get payment status from PortOne: {}", paymentId, e);
@@ -111,7 +111,7 @@ public class PaymentServiceImpl implements PaymentService {
                 return false;
             }
             
-            String merchantUid = portOneResponse.getMerchantUid(); // This is our orderId
+            String merchantUid = portOneResponse.getResponse().getMerchant_uid(); // This is our orderId
             
             // Find order and payment by merchant_uid (orderId)
             Order order = orderRepository.findByOrderId(merchantUid)
@@ -124,9 +124,9 @@ public class PaymentServiceImpl implements PaymentService {
             }
             
             // Verify payment amount matches order amount
-            if (!portOneResponse.getAmount().equals(order.getTotalAmount())) {
+            if (!portOneResponse.getResponse().getAmount().equals(order.getTotalAmount())) {
                 log.error("Payment amount mismatch for order: {}, expected: {}, actual: {}", 
-                        merchantUid, order.getTotalAmount(), portOneResponse.getAmount());
+                        merchantUid, order.getTotalAmount(), portOneResponse.getResponse().getAmount());
                 
                 // Cancel the payment due to amount mismatch
                 try {
@@ -142,12 +142,12 @@ public class PaymentServiceImpl implements PaymentService {
             }
             
             // Check if payment is successful
-            if ("paid".equals(portOneResponse.getStatus())) {
+            if ("paid".equals(portOneResponse.getResponse().getStatus())) {
                 // Update payment status to PAID
                 payment.updatePaidStatus(
-                        portOneResponse.getPgProvider(),
-                        portOneResponse.getPgTid(),
-                        portOneResponse.getReceiptUrl()
+                        portOneResponse.getResponse().getPg_provider(),
+                        portOneResponse.getResponse().getPg_tid(),
+                        "" // receiptUrl - not available in current response structure
                 );
                 
                 // Update order status to PAID
@@ -161,13 +161,12 @@ public class PaymentServiceImpl implements PaymentService {
                             .eventType("STOCK_DECREASE")
                             .orderId(merchantUid)
                             .userId(order.getUserId())
-                            .storeId(order.getStoreId())
                             .items(order.getItems().stream()
                                     .map(item -> OrderEvent.OrderItemEvent.builder()
                                             .productId(item.getProductId())
                                             .quantity(item.getQuantity())
                                             .build())
-                                    .collect(Collectors.toList()))
+                                    .toList())
                             .build();
                     
                     kafkaMessageProducer.publishOrderEvent(stockDecreaseEvent);
@@ -180,10 +179,10 @@ public class PaymentServiceImpl implements PaymentService {
                 log.info("Payment webhook processed successfully: orderId={}, paymentId={}", merchantUid, paymentId);
                 return true;
             } else {
-                log.warn("Payment not successful: paymentId={}, status={}", paymentId, portOneResponse.getStatus());
+                log.warn("Payment not successful: paymentId={}, status={}", paymentId, portOneResponse.getResponse().getStatus());
                 
                 // Update payment status based on PortOne status
-                if ("failed".equals(portOneResponse.getStatus()) || "cancelled".equals(portOneResponse.getStatus())) {
+                if ("failed".equals(portOneResponse.getResponse().getStatus()) || "cancelled".equals(portOneResponse.getResponse().getStatus())) {
                     payment.updateFailedStatus();
                     order.updateStatus(OrderStatus.FAILED);
                     orderRepository.save(order);
@@ -205,7 +204,7 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             // Call PortOne API to get payment information for verification
             PortOnePaymentResponse response = portOneClient.getPayment(paymentId);
-            log.info("Payment verification completed: paymentId={}, status={}", paymentId, response.getStatus());
+            log.info("Payment verification completed: paymentId={}, status={}", paymentId, response.getResponse().getStatus());
             return response;
         } catch (Exception e) {
             log.error("Failed to verify payment: {}", paymentId, e);

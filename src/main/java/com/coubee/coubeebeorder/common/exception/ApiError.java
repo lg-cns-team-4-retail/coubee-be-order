@@ -9,4 +9,8 @@ import lombok.NoArgsConstructor;
 public class ApiError extends RuntimeException {
     protected String errorCode;
     protected String errorMessage;
+    
+    public ApiError(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
 }
