@@ -5,61 +5,40 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * PortOne 웹훅 페이로드 DTO
- * PortOne에서 전송하는 웹훅 JSON 데이터를 매핑하는 클래스
+ * PortOne V2 웹훅 페이로드 DTO
+ * PortOne V2에서 전송하는 웹훅 JSON 데이터를 매핑하는 클래스
  */
 @Data
 @NoArgsConstructor
 public class PortoneWebhookPayload {
     
     /**
-     * PortOne 결제 고유 ID (imp_uid)
+     * PortOne V2 거래 고유 ID (tx_id)
+     * V1의 'imp_uid'에 해당합니다.
      */
-    @JsonProperty("imp_uid")
-    private String impUid;
+    @JsonProperty("tx_id")
+    private String txId;
     
     /**
-     * 가맹점 주문 ID (merchant_uid)
+     * PortOne V2 결제 ID (payment_id)
+     * V1의 'merchant_uid'에 해당하며, 우리의 'orderId'와 같습니다.
      */
-    @JsonProperty("merchant_uid")
-    private String merchantUid;
+    @JsonProperty("payment_id")
+    private String paymentId;
     
     /**
      * 결제 상태
-     * - paid: 결제 완료
-     * - failed: 결제 실패
-     * - cancelled: 결제 취소
+     * - Paid: 결제 완료
+     * - Failed: 결제 실패
+     * - Cancelled: 결제 취소
      */
     @JsonProperty("status")
     private String status;
     
     /**
-     * 결제 금액
+     * 이 클래스를 사용하는 PaymentWebhookController도 함께 수정해야 합니다.
+     * payload.getImpUid() -> payload.getTxId()
+     * payload.getMerchantUid() -> payload.getPaymentId()
+     * 로 변경해야 합니다.
      */
-    @JsonProperty("amount")
-    private Long amount;
-    
-    /**
-     * 결제 방법
-     */
-    @JsonProperty("pay_method")
-    private String payMethod;
-    
-    /**
-     * 결제 완료 시각 (Unix timestamp)
-     */
-    @JsonProperty("paid_at")
-    private Long paidAt;
-    
-    /**
-     * 실패 사유
-     */
-    @JsonProperty("fail_reason")
-    private String failReason;
-    
-    /**
-     * 취소 사유
-     */
-    @JsonProperty("cancel_reason")
-    private String cancelReason;
 }

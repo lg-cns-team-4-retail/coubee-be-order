@@ -22,65 +22,60 @@ public class PaymentWebhookController {
 
     private final PaymentService paymentService;
     private final PortOneWebhookVerifier webhookVerifier;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostMapping("/portone")
     @Operation(summary = "PortOne 웹훅", description = "PortOne에서 전송하는 결제 완료 웹훅을 처리합니다.")
     public ResponseEntity<ApiResponseDto<String>> handlePortOneWebhook(
             @RequestBody String requestBody,
             @Parameter(description = "웹훅 서명")
-            @RequestHeader(value = "X-IamPort-Signature", required = false) String signature,
+            @RequestHeader(value = "PortOne-Signature-v2", required = false) String signature, // V2 헤더 이름 확인 필요
             @Parameter(description = "웹훅 타임스탬프")  
-            @RequestHeader(value = "X-IamPort-Timestamp", required = false) String timestamp) {
-                
-        log.info("PortOne 웹훅 수신");
-        log.info("PortOne Webhook Received - Raw Body: {}", requestBody);
-        log.debug("웹훅 요청 본문: {}", requestBody);
+            @RequestHeader(value = "PortOne-Request-Timestamp", required = false) String timestamp) { // V2 헤더 이름 확인 필요
         
-        // ✅✅✅ 변수를 메소드 최상단에서 선언하고 초기화합니다. ✅✅✅
-        String paymentId = "unknown"; 
+        log.info("PortOne V2 웹훅 수신");
+        log.info("PortOne Webhook Received - Raw Body: {}", requestBody);
+        
+        String transactionId = "unknown";
         
         try {
-            // JSON 본문을 DTO로 파싱하여 결제 ID 추출
             PortoneWebhookPayload payload = objectMapper.readValue(requestBody, PortoneWebhookPayload.class);
-            paymentId = payload.getImpUid(); // ⬅️ 이제 여기서 값을 재할당합니다.
+            transactionId = payload.getTxId();
             
-            log.info("웹훅 페이로드 파싱 완료 - 결제 ID: {}, 상태: {}, 주문 ID: {}", 
-                    paymentId, payload.getStatus(), payload.getMerchantUid());
+            log.info("웹훅 페이로드 파싱 완료 - 거래 ID(tx_id): {}, 상태: {}, 주문 ID(payment_id): {}", 
+                    transactionId, payload.getStatus(), payload.getPaymentId());
 
-            // 웹훅 서명 검증 (원본 requestBody 사용)
             if (webhookVerifier.isWebhookSecretConfigured()) {
-                boolean isValidSignature = webhookVerifier.verifyWebhook(requestBody, signature, timestamp);
-                if (!isValidSignature) {
-                    log.warn("웹훅 서명 검증 실패 - 결제 ID: {}", paymentId);
+                if (!webhookVerifier.verifyWebhook(requestBody, signature, timestamp)) {
+                    log.warn("웹훅 서명 검증 실패 - 거래 ID: {}", transactionId);
                     return ResponseEntity.badRequest()
                             .body(ApiResponseDto.createError("WEBHOOK_VERIFICATION_FAILED", "웹훅 서명이 유효하지 않습니다."));
                 }
-                log.info("웹훅 서명 검증 성공 - 결제 ID: {}", paymentId);
+                log.info("웹훅 서명 검증 성공 - 거래 ID: {}", transactionId);
             } else {
                 log.warn("웹훅 시크릿이 설정되지 않아 서명 검증을 건너뜁니다.");
             }
             
-            if (paymentId == null || paymentId.trim().isEmpty()) {
-                log.warn("결제 ID가 누락되었습니다.");
+            if (transactionId == null || transactionId.trim().isEmpty()) {
+                log.warn("거래 ID(tx_id)가 누락되었습니다.");
                 return ResponseEntity.badRequest()
-                        .body(ApiResponseDto.createError("PAYMENT_ID_REQUIRED", "결제 ID가 필요합니다."));
+                        .body(ApiResponseDto.createError("TRANSACTION_ID_REQUIRED", "거래 ID가 필요합니다."));
             }
             
-            boolean processed = paymentService.handlePaymentWebhook(paymentId);
+            // 서비스 로직에는 PortOne의 고유 거래 ID (tx_id)를 전달합니다.
+            boolean processed = paymentService.handlePaymentWebhook(transactionId);
             
             if (processed) {
-                log.info("웹훅 처리 완료 - 결제 ID: {}", paymentId);
+                log.info("웹훅 처리 완료 - 거래 ID: {}", transactionId);
                 return ResponseEntity.ok(ApiResponseDto.createOk("웹훅 처리 완료"));
             } else {
-                log.warn("웹훅 처리 실패 - 결제 ID: {}", paymentId);
+                log.warn("웹훅 처리 실패 - 거래 ID: {}", transactionId);
                 return ResponseEntity.internalServerError()
                         .body(ApiResponseDto.createError("WEBHOOK_PROCESSING_FAILED", "웹훅 처리 중 오류가 발생했습니다."));
             }
             
         } catch (Exception e) {
-            // ✅ 이제 이 catch 블록에서도 paymentId 변수에 접근할 수 있습니다.
-            log.error("웹훅 처리 중 예외 발생 - 결제 ID: " + paymentId, e);
+            log.error("웹훅 처리 중 예외 발생 - 거래 ID: " + transactionId, e);
             return ResponseEntity.internalServerError()
                     .body(ApiResponseDto.createError("INTERNAL_SERVER_ERROR", "웹훅 처리 중 내부 오류가 발생했습니다."));
         }
