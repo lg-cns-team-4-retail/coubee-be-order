@@ -102,8 +102,8 @@ public class OrderController {
             @Valid @RequestBody OrderStatusUpdateRequest request) {
 
         // Validate user has permission to update order status
-        if (!"STORE_OWNER".equals(userRole) && !"ADMIN".equals(userRole)) {
-            throw new IllegalArgumentException("Only store owners and admins can update order status");
+        if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
+            throw new IllegalArgumentException("Only admins and super admins can update order status");
         }
 
         OrderStatusUpdateResponse response = orderService.updateOrderStatus(orderId, request, userId);
