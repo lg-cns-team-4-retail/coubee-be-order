@@ -130,7 +130,14 @@ public class PaymentServiceImpl implements PaymentService {
                 
                 // Cancel the payment due to amount mismatch
                 try {
-                    // TODO: Implement payment cancellation logic here if needed
+                    PortOnePaymentCancelRequest cancelRequest = PortOnePaymentCancelRequest.builder()
+                            .imp_uid(paymentId)
+                            .merchant_uid(merchantUid)
+                            .reason("결제 금액 불일치로 인한 자동 취소")
+                            .build();
+                    portOneClient.cancelPayment(cancelRequest);
+                    log.info("Mismatched payment cancelled successfully on PortOne: {}", paymentId);
+                    
                     payment.updateFailedStatus();
                     order.updateStatus(OrderStatus.FAILED);
                     orderRepository.save(order);
