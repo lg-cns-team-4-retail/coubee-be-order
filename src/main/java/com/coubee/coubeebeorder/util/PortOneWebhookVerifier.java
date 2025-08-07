@@ -22,16 +22,20 @@ public class PortOneWebhookVerifier {
     @Value("${portone.v2.webhook-secret:default_secret}")
     private String webhookSecret;
 
-        public boolean verifyWebhook(String transactionId, String signature, String timestamp) {
+    // ✅✅✅ 파라미터 이름을 requestBody로 변경합니다. (가장 중요) ✅✅✅
+    public boolean verifyWebhook(String requestBody, String signature, String timestamp) {
         try {
             if (!isValidTimestamp(timestamp)) {
                 log.warn("웹훅 타임스탬프 검증 실패: {}", timestamp);
                 return false;
             }
 
-                        String expectedSignature = generateSignature(transactionId, timestamp);
-                        String[] signatureParts = signature.split(",");
-            if (signatureParts.length != 2) {
+            // ✅✅✅ 서명 생성 시 transactionId 대신 requestBody 전체를 사용합니다. ✅✅✅
+            String expectedSignature = generateSignature(requestBody, timestamp);
+            
+            // "v1," 접두사 처리
+            String[] signatureParts = signature.split(",");
+            if (signatureParts.length < 2) {
                 log.warn("[WEBHOOK_DEBUG] Invalid signature format. Expected 'v1,hash'. Received: '{}'", signature);
                 return false;
             }
@@ -42,9 +46,9 @@ public class PortOneWebhookVerifier {
             if (isValid) {
                 log.info("PortOne 웹훅 서명 검증 성공");
             } else {
-                                log.warn("PortOne 웹훅 서명 검증 실패");
-                log.warn("[WEBHOOK_DEBUG] Expected Signature: '{}'", expectedSignature);
-                log.warn("[WEBHOOK_DEBUG] Received Signature: '{}'", signature);
+                log.warn("PortOne 웹훅 서명 검증 실패");
+                log.warn("[WEBHOOK_DEBUG] Expected Signature (Calculated): '{}'", expectedSignature);
+                log.warn("[WEBHOOK_DEBUG] Received Signature (from Header): '{}'", signature);
             }
             
             return isValid;
@@ -56,6 +60,10 @@ public class PortOneWebhookVerifier {
     }
 
     private boolean isValidTimestamp(String timestampStr) {
+        if (timestampStr == null) {
+            log.warn("잘못된 타임스탬프 형식: null");
+            return false;
+        }
         try {
             long webhookTimestamp = Long.parseLong(timestampStr);
             long currentTimestamp = Instant.now().getEpochSecond();
@@ -76,12 +84,18 @@ public class PortOneWebhookVerifier {
         }
     }
 
-        private String generateSignature(String transactionId, String timestamp) 
+    // ✅✅✅ 파라미터 이름을 requestBody로 변경합니다. ✅✅✅
+    private String generateSignature(String requestBody, String timestamp) 
             throws NoSuchAlgorithmException, InvalidKeyException {
         
-                String payload = transactionId + "." + timestamp;
+        // ✅✅✅ 서명 생성 원본을 스펙에 맞게 '타임스탬프.본문'으로 수정합니다. ✅✅✅
+        String payload = timestamp + "." + requestBody;
         
-        byte[] secretBytes = webhookSecret.getBytes(StandardCharsets.UTF_8);
+        // ✅✅✅ Secret Key를 Base64로 디코딩하도록 수정합니다. ✅✅✅
+        String cleanSecret = webhookSecret.startsWith("whsec_") 
+            ? webhookSecret.substring(6) 
+            : webhookSecret;
+        byte[] secretBytes = Base64.getDecoder().decode(cleanSecret);
         
         Mac mac = Mac.getInstance(HMAC_SHA256);
         SecretKeySpec secretKeySpec = new SecretKeySpec(secretBytes, HMAC_SHA256);
@@ -96,7 +110,6 @@ public class PortOneWebhookVerifier {
         if (receivedSignature == null || expectedSignature == null) {
             return false;
         }
-        
         return constantTimeEquals(receivedSignature, expectedSignature);
     }
 
@@ -116,7 +129,6 @@ public class PortOneWebhookVerifier {
     public boolean isWebhookSecretConfigured() {
         return webhookSecret != null 
             && !webhookSecret.trim().isEmpty() 
-            && !webhookSecret.equals("test_webhook")
             && !webhookSecret.equals("default_secret");
     }
 }

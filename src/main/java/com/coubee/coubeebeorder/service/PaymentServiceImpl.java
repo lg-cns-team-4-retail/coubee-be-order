@@ -36,8 +36,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final PortOneClient portOneClient;
     private final KafkaMessageProducer kafkaMessageProducer;
-    
-    // ✅✅✅ 웹훅 처리를 위해 아래 의존성들을 추가합니다. ✅✅✅
     private final PortOneWebhookVerifier webhookVerifier;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -52,15 +50,13 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = Payment.createPayment(
                 orderId,
                 order,
-                "card", // 이 부분은 request에서 받아오도록 수정할 수 있습니다.
+                "card", // This can be updated based on request
                 order.getTotalAmount()
         );
         
         paymentRepository.save(payment);
         order.setPayment(payment);
         orderRepository.save(order);
-        
-        // V2 API에서는 사전 등록(prepare) API가 별도로 없으므로 해당 호출은 제거합니다.
         
         log.info("Payment preparation completed for order: {}", orderId);
         
@@ -86,7 +82,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
-    // ✅✅✅ 이 메소드가 핵심적인 수정 부분입니다. ✅✅✅
     @Override
     @Transactional
     public boolean handlePaymentWebhook(String signature, String timestamp, String requestBody) {
@@ -95,29 +90,26 @@ public class PaymentServiceImpl implements PaymentService {
         String merchantUid = "unknown";
 
         try {
-            // 1. DTO로 파싱
             PortoneWebhookPayload payload = objectMapper.readValue(requestBody, PortoneWebhookPayload.class);
             transactionId = payload.getData().getTransactionId();
             merchantUid = payload.getData().getPaymentId();
 
             log.info("웹훅 페이로드 파싱 완료 - 거래 ID: {}, 주문 ID: {}", transactionId, merchantUid);
 
-            // 2. 서명 검증
             if (webhookVerifier.isWebhookSecretConfigured()) {
-                                if (!webhookVerifier.verifyWebhook(transactionId, signature, timestamp)) {
+                // ✅✅✅ 핵심 수정 부분: transactionId 대신 requestBody를 전달합니다. ✅✅✅
+                if (!webhookVerifier.verifyWebhook(requestBody, signature, timestamp)) {
                     log.warn("웹훅 서명 검증 실패 - 거래 ID: {}", transactionId);
                     return false; 
                 }
                 log.info("웹훅 서명 검증 성공 - 거래 ID: {}", transactionId);
             }
 
-            // 3. transactionId 유효성 검사
             if (transactionId == null || transactionId.trim().isEmpty()) {
                 log.warn("거래 ID(transactionId)가 누락되었습니다.");
                 return false;
             }
 
-            // 4. PortOne API를 통해 실제 결제 정보 재조회 및 검증 (기존 로직)
             return processPaymentVerification(transactionId, merchantUid);
 
         } catch (Exception e) {
@@ -126,7 +118,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
     
-    // handlePaymentWebhook의 실제 처리 로직을 별도 메소드로 분리
     private boolean processPaymentVerification(String transactionId, String merchantUid) {
         PortOnePaymentResponse portOneResponse = portOneClient.getPayment(transactionId);
         
@@ -150,17 +141,15 @@ public class PaymentServiceImpl implements PaymentService {
             return false;
         }
 
-        // 이미 처리된 결제건인지 확인 (멱등성)
         if (payment.getStatus() == PaymentStatus.PAID) {
             log.warn("Payment already processed for order: {}", merchantUid);
-            return true; // 이미 성공한 요청이므로 성공으로 처리
+            return true;
         }
         
         if (!portOneResponse.getResponse().getAmount().equals(order.getTotalAmount())) {
             log.error("Payment amount mismatch for order: {}, expected: {}, actual: {}", 
                     merchantUid, order.getTotalAmount(), portOneResponse.getResponse().getAmount());
             
-            // 금액 불일치 시 자동 취소 로직
             cancelMismatchedPayment(transactionId, merchantUid);
             payment.updateFailedStatus();
             order.updateStatus(OrderStatus.FAILED);
@@ -205,7 +194,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
     
-    // 금액 불일치 시 자동 취소 로직
     private void cancelMismatchedPayment(String transactionId, String merchantUid) {
         try {
             PortOnePaymentCancelRequest cancelRequest = PortOnePaymentCancelRequest.builder()
@@ -220,7 +208,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
-    // 재고 감소 이벤트 발행 로직
     private void publishStockDecreaseEvent(Order order) {
         try {
             OrderEvent stockDecreaseEvent = OrderEvent.builder()
