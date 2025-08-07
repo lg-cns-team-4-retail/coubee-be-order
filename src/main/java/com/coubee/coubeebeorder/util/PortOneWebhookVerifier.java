@@ -30,7 +30,14 @@ public class PortOneWebhookVerifier {
             }
 
                         String expectedSignature = generateSignature(transactionId, timestamp);
-            boolean isValid = verifySignature(signature, expectedSignature);
+                        String[] signatureParts = signature.split(",");
+            if (signatureParts.length != 2) {
+                log.warn("[WEBHOOK_DEBUG] Invalid signature format. Expected 'v1,hash'. Received: '{}'", signature);
+                return false;
+            }
+
+            String receivedSignatureHash = signatureParts[1];
+            boolean isValid = verifySignature(receivedSignatureHash, expectedSignature);
             
             if (isValid) {
                 log.info("PortOne 웹훅 서명 검증 성공");
