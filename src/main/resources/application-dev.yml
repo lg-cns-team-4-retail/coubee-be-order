@@ -46,7 +46,7 @@ portone:
     secret: test_secret
   v2:
     store-id: ${PORTONE_STORE_ID:store-a9463375-7b07-40fc-8c4f-e0bd4fb0c2b7}
-    api-secret: ${PORTONE_API_SECRET:zncFiBtA0lilnsWsTaBUgepbSSp7YYbXFOvI62d9jJ3RfEpM9Tjqr3ikg1BRyUM6DFmXrAwZ43ryLamW}
+    api-secret: ${PORTONE_API_SECRET:Oi2psBczLZl1PzeoVMBHOFFuBQNtbSquOacTMxGWUDWpx15EVef1Rggn3c9FsIWzTWNSln9X8byDQ2wt}
     channels:
       # 각 결제 수단별 채널 키 (환경 변수로 주입 가능) - 모든 키를 소문자로 통일
       card: ${PORTONE_CHANNEL_KEY_TOSSPAYMENTS:channel-key-a448c12c-9f97-4eeb-9506-97279641dbf9}

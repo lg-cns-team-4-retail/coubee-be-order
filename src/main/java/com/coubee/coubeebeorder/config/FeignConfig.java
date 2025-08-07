@@ -60,7 +60,6 @@ public class FeignConfig {
             if (response.status() >= 500) {
                 return new RuntimeException("Server error occurred. Please try again later.");
             } else if (response.status() >= 400) {
-                // 401 오류에 대한 더 상세한 메시지 제공
                 if (response.status() == 401) {
                     return new RuntimeException("Authentication failed. Please check your PortOne API Secret key.");
                 }
