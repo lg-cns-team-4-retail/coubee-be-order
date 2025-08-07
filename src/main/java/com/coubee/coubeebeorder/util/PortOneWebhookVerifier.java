@@ -81,11 +81,7 @@ public class PortOneWebhookVerifier {
         
                 String payload = transactionId + "." + timestamp;
         
-        String cleanSecret = webhookSecret.startsWith("whsec_") 
-            ? webhookSecret.substring(6) 
-            : webhookSecret;
-        
-        byte[] secretBytes = Base64.getDecoder().decode(cleanSecret);
+        byte[] secretBytes = webhookSecret.getBytes(StandardCharsets.UTF_8);
         
         Mac mac = Mac.getInstance(HMAC_SHA256);
         SecretKeySpec secretKeySpec = new SecretKeySpec(secretBytes, HMAC_SHA256);
