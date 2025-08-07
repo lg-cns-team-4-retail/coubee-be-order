@@ -1,7 +1,7 @@
 package com.coubee.coubeebeorder.service;
 
 // ✅✅✅ PortOnePaymentResponse 대신 SDK의 DTO를 import 합니다. ✅✅✅
-import io.portone.sdk.server.payment.PaymentGetResponse;
+// import io.portone.sdk.server.payment.PaymentGetResponse;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyRequest;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyResponse;
 
@@ -15,5 +15,5 @@ public interface PaymentService {
     boolean handlePaymentWebhook(String webhookId, String signature, String timestamp, String requestBody);
 
     // ✅✅✅ 반환 타입을 SDK의 DTO로 변경합니다. ✅✅✅
-    PaymentGetResponse verifyPayment(String paymentId);
+    Object verifyPayment(String paymentId);
 }

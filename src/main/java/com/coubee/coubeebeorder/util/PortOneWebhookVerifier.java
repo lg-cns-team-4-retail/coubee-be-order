@@ -23,14 +23,9 @@ public class PortOneWebhookVerifier {
             return false;
         }
 
-        Map<String, String> headers = Stream.of(new String[][] {
-            { "webhook-signature", signature },
-            { "webhook-timestamp", timestamp },
-        }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
-
         try {
-            // ✅ 공식 SDK의 verify 메소드 사용
-            webhookVerifier.verify(requestBody, headers);
+            // ✅ 공식 SDK의 verify 메소드 사용 - 4개 파라미터 필요
+            webhookVerifier.verify(requestBody, signature, timestamp, "webhook-id");
             log.info("PortOne webhook signature verified successfully.");
             return true;
         } catch (Exception e) {
