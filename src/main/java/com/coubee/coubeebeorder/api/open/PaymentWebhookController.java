@@ -28,10 +28,14 @@ public class PaymentWebhookController {
     @Operation(summary = "PortOne 웹훅", description = "PortOne에서 전송하는 결제 완료 웹훅을 처리합니다.")
     public ResponseEntity<ApiResponseDto<String>> handlePortOneWebhook(
             @RequestBody String requestBody,
+            
+            // ✅✅✅ V2 공식 헤더 이름으로 수정 ✅✅✅
             @Parameter(description = "웹훅 서명")
-            @RequestHeader(value = "PortOne-Signature-v2", required = false) String signature, // V2 헤더 이름 확인 필요
+            @RequestHeader(value = "PortOne-Signature-v2", required = false) String signature,
+            
+            // ✅✅✅ V2 공식 헤더 이름으로 수정 ✅✅✅
             @Parameter(description = "웹훅 타임스탬프")  
-            @RequestHeader(value = "PortOne-Request-Timestamp", required = false) String timestamp) { // V2 헤더 이름 확인 필요
+            @RequestHeader(value = "PortOne-Request-Timestamp", required = false) String timestamp) {
         
         log.info("PortOne V2 웹훅 수신");
         log.info("PortOne Webhook Received - Raw Body: {}", requestBody);
@@ -62,7 +66,6 @@ public class PaymentWebhookController {
                         .body(ApiResponseDto.createError("TRANSACTION_ID_REQUIRED", "거래 ID가 필요합니다."));
             }
             
-            // 서비스 로직에는 PortOne의 고유 거래 ID (tx_id)를 전달합니다.
             boolean processed = paymentService.handlePaymentWebhook(transactionId);
             
             if (processed) {
