@@ -17,7 +17,7 @@ import com.coubee.coubeebeorder.remote.PortOneClient;
 import com.coubee.coubeebeorder.remote.dto.PortOnePaymentCancelRequest;
 import com.coubee.coubeebeorder.remote.dto.PortOnePaymentResponse;
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
-import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
+import io.portone.sdk.server.webhook.WebhookVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +36,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final PortOneClient portOneClient;
     private final KafkaMessageProducer kafkaMessageProducer;
-    private final PortOneWebhookVerifier webhookVerifier;
+    private final WebhookVerifier portOneWebhookVerifier;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -84,7 +84,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public boolean handlePaymentWebhook(String signature, String timestamp, String requestBody) {
+    public boolean handlePaymentWebhook(String webhookId, String signature, String timestamp, String requestBody) {
         log.info("Handling payment webhook in service layer.");
         String transactionId = "unknown";
         String merchantUid = "unknown";
@@ -96,13 +96,13 @@ public class PaymentServiceImpl implements PaymentService {
 
             log.info("웹훅 페이로드 파싱 완료 - 거래 ID: {}, 주문 ID: {}", transactionId, merchantUid);
 
-            if (webhookVerifier.isWebhookSecretConfigured()) {
-                // ✅✅✅ 핵심 수정 부분: transactionId 대신 requestBody를 전달합니다. ✅✅✅
-                if (!webhookVerifier.verifyWebhook(requestBody, signature, timestamp)) {
-                    log.warn("웹훅 서명 검증 실패 - 거래 ID: {}", transactionId);
-                    return false; 
-                }
+            // 공식 SDK를 사용한 웹훅 서명 검증
+            try {
+                portOneWebhookVerifier.verify(requestBody, webhookId, signature, timestamp);
                 log.info("웹훅 서명 검증 성공 - 거래 ID: {}", transactionId);
+            } catch (Exception e) {
+                log.warn("웹훅 서명 검증 실패 - 거래 ID: {}, 오류: {}", transactionId, e.getMessage());
+                return false;
             }
 
             if (transactionId == null || transactionId.trim().isEmpty()) {

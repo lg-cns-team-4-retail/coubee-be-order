@@ -10,7 +10,7 @@ public interface PaymentService {
 
     Object getPaymentStatus(String paymentId);
 
-    boolean handlePaymentWebhook(String signature, String timestamp, String requestBody);
+    boolean handlePaymentWebhook(String webhookId, String signature, String timestamp, String requestBody);
 
     PortOnePaymentResponse verifyPayment(String paymentId);
 }

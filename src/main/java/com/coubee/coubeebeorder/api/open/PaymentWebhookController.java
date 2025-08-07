@@ -23,17 +23,20 @@ public class PaymentWebhookController {
     @Operation(summary = "PortOne 웹훅", description = "PortOne에서 전송하는 결제 완료 웹훅을 처리합니다.")
     public ResponseEntity<ApiResponseDto<String>> handlePortOneWebhook(
             @RequestBody String requestBody,
+            @Parameter(description = "웹훅 ID")
+            @RequestHeader(value = "webhook-id", required = false) String webhookId,
             @Parameter(description = "웹훅 서명")
             @RequestHeader(value = "webhook-signature", required = false) String signature,
             @Parameter(description = "웹훅 타임스탬프")  
             @RequestHeader(value = "webhook-timestamp", required = false) String timestamp) {
         
                 log.info("PortOne V2 Standard Webhook 수신. Service layer로 처리 위임.");
+        log.info("[WEBHOOK_DEBUG] Received ID: '{}'", webhookId);
         log.info("[WEBHOOK_DEBUG] Received Signature: '{}'", signature);
         log.info("[WEBHOOK_DEBUG] Received Timestamp: '{}'", timestamp);
         log.debug("Webhook Raw Body: {}", requestBody);
 
-        boolean processed = paymentService.handlePaymentWebhook(signature, timestamp, requestBody);
+        boolean processed = paymentService.handlePaymentWebhook(webhookId, signature, timestamp, requestBody);
 
         if (processed) {
             log.info("Webhook processed successfully by service.");
