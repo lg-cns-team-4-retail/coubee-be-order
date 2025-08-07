@@ -22,14 +22,14 @@ public class PortOneWebhookVerifier {
     @Value("${portone.v2.webhook-secret:default_secret}")
     private String webhookSecret;
 
-    public boolean verifyWebhook(String requestBody, String signature, String timestamp) {
+        public boolean verifyWebhook(String transactionId, String signature, String timestamp) {
         try {
             if (!isValidTimestamp(timestamp)) {
                 log.warn("웹훅 타임스탬프 검증 실패: {}", timestamp);
                 return false;
             }
 
-            String expectedSignature = generateSignature(requestBody, timestamp);
+                        String expectedSignature = generateSignature(transactionId, timestamp);
             boolean isValid = verifySignature(signature, expectedSignature);
             
             if (isValid) {
@@ -68,10 +68,10 @@ public class PortOneWebhookVerifier {
         }
     }
 
-    private String generateSignature(String requestBody, String timestamp) 
+        private String generateSignature(String transactionId, String timestamp) 
             throws NoSuchAlgorithmException, InvalidKeyException {
         
-        String payload = timestamp + "." + requestBody;
+                String payload = transactionId + "." + timestamp;
         
         String cleanSecret = webhookSecret.startsWith("whsec_") 
             ? webhookSecret.substring(6) 

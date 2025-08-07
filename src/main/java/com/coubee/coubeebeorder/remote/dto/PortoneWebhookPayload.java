@@ -1,5 +1,7 @@
 package com.coubee.coubeebeorder.remote.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,6 +12,7 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class PortoneWebhookPayload {
 
     @JsonProperty("type")
@@ -34,14 +37,15 @@ public class PortoneWebhookPayload {
          * 포트원에서 채번한 고유 결제 시도 번호
          * V1의 imp_uid에 해당
          */
-        @JsonProperty("transactionId")
+                @JsonProperty("transactionId")
+        @JsonAlias("tx_id")
         private String transactionId;
 
         /**
          * 고객사에서 채번한 결제 건의 고유 주문 번호
          * V1의 merchant_uid에 해당
          */
-        @JsonProperty("paymentId")
+                @JsonProperty("paymentId")
         private String paymentId;
         
         @JsonProperty("cancellationId")

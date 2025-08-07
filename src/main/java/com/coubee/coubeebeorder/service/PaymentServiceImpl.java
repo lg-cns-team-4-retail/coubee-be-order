@@ -104,7 +104,7 @@ public class PaymentServiceImpl implements PaymentService {
 
             // 2. 서명 검증
             if (webhookVerifier.isWebhookSecretConfigured()) {
-                if (!webhookVerifier.verifyWebhook(requestBody, signature, timestamp)) {
+                                if (!webhookVerifier.verifyWebhook(transactionId, signature, timestamp)) {
                     log.warn("웹훅 서명 검증 실패 - 거래 ID: {}", transactionId);
                     return false; 
                 }
