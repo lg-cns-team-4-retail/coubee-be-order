@@ -17,6 +17,8 @@ public class PortOneProperties {
 
     private String apiSecret;
 
+    private String webhookSecret;
+
     private Map<String, String> channels;
 
     public String getChannelKey(String payMethod) {

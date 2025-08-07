@@ -13,18 +13,20 @@ import com.coubee.coubeebeorder.domain.event.OrderEvent;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.domain.repository.PaymentRepository;
 import com.coubee.coubeebeorder.event.producer.KafkaMessageProducer;
-import com.coubee.coubeebeorder.remote.PortOneClient;
-import com.coubee.coubeebeorder.remote.dto.PortOnePaymentCancelRequest;
-import com.coubee.coubeebeorder.remote.dto.PortOnePaymentResponse;
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
-import io.portone.sdk.server.webhook.WebhookVerifier;
+import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.portone.sdk.server.payment.PaymentClient;
+import io.portone.sdk.server.payment.PaymentGetResponse;
+import io.portone.sdk.server.payment.PaidPayment;
+import io.portone.sdk.server.payment.CancelPaymentRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -34,10 +36,10 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
-    private final PortOneClient portOneClient;
     private final KafkaMessageProducer kafkaMessageProducer;
-    private final WebhookVerifier portOneWebhookVerifier;
+    private final PortOneWebhookVerifier webhookVerifier;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final PaymentClient portonePaymentClient; // 공식 SDK 클라이언트
 
     @Override
     @Transactional
@@ -47,16 +49,17 @@ public class PaymentServiceImpl implements PaymentService {
         Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다. Order ID: " + orderId));
         
-        Payment payment = Payment.createPayment(
-                orderId,
-                order,
-                "card", // This can be updated based on request
-                order.getTotalAmount()
-        );
-        
-        paymentRepository.save(payment);
-        order.setPayment(payment);
-        orderRepository.save(order);
+        // 이미 생성된 Payment가 있는지 확인하고, 없으면 새로 생성
+        paymentRepository.findByOrder_OrderId(orderId).orElseGet(() -> {
+            Payment newPayment = Payment.createPayment(
+                    orderId, // 초기 paymentId는 orderId와 동일하게 사용
+                    order,
+                    "CARD", // 기본값, 실제 결제 시 웹훅에서 업데이트됨
+                    order.getTotalAmount()
+            );
+            order.setPayment(newPayment);
+            return paymentRepository.save(newPayment);
+        });
         
         log.info("Payment preparation completed for order: {}", orderId);
         
@@ -69,13 +72,11 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PortOnePaymentResponse getPaymentStatus(String paymentId) {
+    public Object getPaymentStatus(String paymentId) {
         log.info("Getting payment status for: {}", paymentId);
-        
         try {
-            PortOnePaymentResponse response = portOneClient.getPayment(paymentId);
-            log.info("Payment status retrieved from PortOne: paymentId={}, status={}", paymentId, response.getResponse().getStatus());
-            return response;
+            // SDK를 사용하여 결제 정보 비동기 조회 후 결과 대기
+            return portonePaymentClient.getPayment(paymentId).join();
         } catch (Exception e) {
             log.error("Failed to get payment status from PortOne: {}", paymentId, e);
             throw new ApiError("결제 상태 조회에 실패했습니다.");
@@ -85,109 +86,92 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public boolean handlePaymentWebhook(String webhookId, String signature, String timestamp, String requestBody) {
-        log.info("Handling payment webhook in service layer.");
         String transactionId = "unknown";
-        String merchantUid = "unknown";
-
         try {
+            if (!webhookVerifier.verifyWebhook(requestBody, signature, timestamp)) {
+                return false; // 서명 검증 실패
+            }
+
             PortoneWebhookPayload payload = objectMapper.readValue(requestBody, PortoneWebhookPayload.class);
             transactionId = payload.getData().getTransactionId();
-            merchantUid = payload.getData().getPaymentId();
+            String merchantUid = payload.getData().getPaymentId();
 
-            log.info("웹훅 페이로드 파싱 완료 - 거래 ID: {}, 주문 ID: {}", transactionId, merchantUid);
+            log.info("웹훅 검증 및 파싱 성공 - 거래 ID: {}, 주문 ID: {}", transactionId, merchantUid);
 
-            // 공식 SDK를 사용한 웹훅 서명 검증
-            try {
-                portOneWebhookVerifier.verify(requestBody, webhookId, signature, timestamp);
-                log.info("웹훅 서명 검증 성공 - 거래 ID: {}", transactionId);
-            } catch (Exception e) {
-                log.warn("웹훅 서명 검증 실패 - 거래 ID: {}, 오류: {}", transactionId, e.getMessage());
+            if (transactionId == null || transactionId.isBlank()) {
+                log.warn("웹훅 페이로드에 거래 ID(transactionId)가 없습니다.");
                 return false;
             }
 
-            if (transactionId == null || transactionId.trim().isEmpty()) {
-                log.warn("거래 ID(transactionId)가 누락되었습니다.");
+            // SDK를 사용하여 결제 정보 비동기 조회
+            CompletableFuture<PaymentGetResponse> future = portonePaymentClient.getPayment(transactionId);
+            
+            // 비동기 작업이 완료될 때까지 기다리고 결과를 처리
+            return future.thenApply(paymentResponse -> {
+                if (paymentResponse instanceof PaidPayment paidPayment) {
+                    // 트랜잭션 내에서 상태 변경을 위해 @Transactional 메소드를 호출
+                    return processPaidPayment(paidPayment);
+                } else {
+                    log.warn("결제 상태가 'Paid'가 아닙니다. Status: {}", paymentResponse.getClass().getSimpleName());
+                    return false;
+                }
+            }).exceptionally(e -> {
+                log.error("PortOne API 호출 중 예외 발생: {}", e.getMessage(), e);
                 return false;
-            }
-
-            return processPaymentVerification(transactionId, merchantUid);
+            }).join();
 
         } catch (Exception e) {
-            log.error("Error handling payment webhook: transactionId={}, orderId={}", transactionId, merchantUid, e);
+            log.error("웹훅 처리 중 최상위 예외 발생: transactionId={}", transactionId, e);
             return false;
         }
     }
     
-    private boolean processPaymentVerification(String transactionId, String merchantUid) {
-        PortOnePaymentResponse portOneResponse = portOneClient.getPayment(transactionId);
-        
-        if (portOneResponse == null || portOneResponse.getResponse() == null) {
-            log.error("Failed to retrieve payment information from PortOne: {}", transactionId);
-            return false;
-        }
+    @Transactional // 별도 트랜잭션으로 분리하여 상태 변경 보장
+    public boolean processPaidPayment(PaidPayment paidPayment) {
+        String merchantUid = paidPayment.getPaymentId();
+        String transactionId = paidPayment.getTransactionId();
 
-        String responseMerchantUid = portOneResponse.getResponse().getMerchant_uid();
-        if (!merchantUid.equals(responseMerchantUid)) {
-            log.error("Webhook merchant_uid does not match PortOne API response merchant_uid. Webhook: {}, API: {}", merchantUid, responseMerchantUid);
-            return false;
-        }
-        
         Order order = orderRepository.findByOrderId(merchantUid)
                 .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다. Order ID: " + merchantUid));
-        
+
         Payment payment = order.getPayment();
         if (payment == null) {
-            log.error("Payment not found for order: {}", merchantUid);
+            log.error("주문에 연결된 결제 정보가 없습니다: {}", merchantUid);
             return false;
         }
 
         if (payment.getStatus() == PaymentStatus.PAID) {
-            log.warn("Payment already processed for order: {}", merchantUid);
+            log.warn("이미 처리된 결제입니다: {}", merchantUid);
             return true;
         }
-        
-        if (!portOneResponse.getResponse().getAmount().equals(order.getTotalAmount())) {
-            log.error("Payment amount mismatch for order: {}, expected: {}, actual: {}", 
-                    merchantUid, order.getTotalAmount(), portOneResponse.getResponse().getAmount());
-            
-            cancelMismatchedPayment(transactionId, merchantUid);
+
+        if (paidPayment.getAmount().getTotal() != order.getTotalAmount()) {
+            log.error("금액 불일치: 주문금액={}, 결제금액={}", order.getTotalAmount(), paidPayment.getAmount().getTotal());
+            cancelMismatchedPayment(transactionId, merchantUid); // 자동 취소 시도
             payment.updateFailedStatus();
             order.updateStatus(OrderStatus.FAILED);
-            orderRepository.save(order);
             return false;
         }
+
+        payment.updatePaidStatus(
+            paidPayment.getChannel().getPgProvider().name(),
+            paidPayment.getPgTxId(),
+            paidPayment.getReceiptUrl()
+        );
+        order.updateStatus(OrderStatus.PAID);
+        // orderRepository.save(order)는 payment 저장 시 변경 감지로 인해 자동으로 처리됨
+
+        publishStockDecreaseEvent(order);
         
-        if ("paid".equals(portOneResponse.getResponse().getStatus())) {
-            payment.updatePaidStatus(
-                    portOneResponse.getResponse().getPg_provider(),
-                    portOneResponse.getResponse().getPg_tid(),
-                    portOneResponse.getResponse().getReceipt_url()
-            );
-            
-            order.updateStatus(OrderStatus.PAID);
-            orderRepository.save(order);
-            
-            publishStockDecreaseEvent(order);
-            
-            log.info("Payment webhook processed successfully: orderId={}, transactionId={}", merchantUid, transactionId);
-            return true;
-        } else {
-            log.warn("Payment not successful: transactionId={}, status={}", transactionId, portOneResponse.getResponse().getStatus());
-            if ("failed".equals(portOneResponse.getResponse().getStatus()) || "cancelled".equals(portOneResponse.getResponse().getStatus())) {
-                payment.updateFailedStatus();
-                order.updateStatus(OrderStatus.FAILED);
-                orderRepository.save(order);
-            }
-            return false;
-        }
+        log.info("결제 성공 처리 완료: 주문 ID {}", merchantUid);
+        return true;
     }
 
     @Override
-    public PortOnePaymentResponse verifyPayment(String paymentId) {
-        log.info("Verifying payment: {}", paymentId);
-        
+    public PaymentGetResponse verifyPayment(String paymentId) {
+        log.info("Verifying payment with SDK: {}", paymentId);
         try {
-            return portOneClient.getPayment(paymentId);
+            return portonePaymentClient.getPayment(paymentId).join();
         } catch (Exception e) {
             log.error("Failed to verify payment: {}", paymentId, e);
             throw new ApiError("결제 검증에 실패했습니다.");
@@ -196,12 +180,8 @@ public class PaymentServiceImpl implements PaymentService {
     
     private void cancelMismatchedPayment(String transactionId, String merchantUid) {
         try {
-            PortOnePaymentCancelRequest cancelRequest = PortOnePaymentCancelRequest.builder()
-                    .imp_uid(transactionId)
-                    .merchant_uid(merchantUid)
-                    .reason("결제 금액 불일치로 인한 자동 취소")
-                    .build();
-            portOneClient.cancelPayment(cancelRequest);
+            CancelPaymentRequest cancelRequest = new CancelPaymentRequest("결제 금액 불일치로 인한 자동 취소");
+            portonePaymentClient.cancelPayment(transactionId, cancelRequest).join();
             log.info("Mismatched payment cancelled successfully on PortOne: {}", transactionId);
         } catch (Exception e) {
             log.error("Failed to cancel mismatched payment: {}", transactionId, e);
@@ -222,19 +202,16 @@ public class PaymentServiceImpl implements PaymentService {
                                     .build())
                             .toList())
                     .build();
-            
             kafkaMessageProducer.publishOrderEvent(stockDecreaseEvent);
-            log.info("Stock decrease event published for paid order: {}", order.getOrderId());
         } catch (Exception e) {
             log.error("Failed to publish stock decrease event for order: {}", order.getOrderId(), e);
         }
     }
     
     private String generateOrderName(Order order) {
-        if (order.getItems().isEmpty()) {
-            return "빈 주문";
+        if (order.getItems() == null || order.getItems().isEmpty()) {
+            return "주문 상품 없음";
         }
-        
         OrderItem firstItem = order.getItems().get(0);
         if (order.getItems().size() == 1) {
             return firstItem.getProductName();
