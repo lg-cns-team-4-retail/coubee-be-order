@@ -35,8 +35,9 @@ public class PortOneWebhookVerifier {
             if (isValid) {
                 log.info("PortOne 웹훅 서명 검증 성공");
             } else {
-                log.warn("PortOne 웹훅 서명 검증 실패");
-                log.debug("Expected: {}, Received: {}", expectedSignature, signature);
+                                log.warn("PortOne 웹훅 서명 검증 실패");
+                log.warn("[WEBHOOK_DEBUG] Expected Signature: '{}'", expectedSignature);
+                log.warn("[WEBHOOK_DEBUG] Received Signature: '{}'", signature);
             }
             
             return isValid;

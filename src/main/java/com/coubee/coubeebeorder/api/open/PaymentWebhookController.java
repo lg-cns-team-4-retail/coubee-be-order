@@ -28,7 +28,9 @@ public class PaymentWebhookController {
             @Parameter(description = "웹훅 타임스탬프")  
             @RequestHeader(value = "webhook-timestamp", required = false) String timestamp) {
         
-        log.info("PortOne V2 Standard Webhook 수신. Service layer로 처리 위임.");
+                log.info("PortOne V2 Standard Webhook 수신. Service layer로 처리 위임.");
+        log.info("[WEBHOOK_DEBUG] Received Signature: '{}'", signature);
+        log.info("[WEBHOOK_DEBUG] Received Timestamp: '{}'", timestamp);
         log.debug("Webhook Raw Body: {}", requestBody);
 
         boolean processed = paymentService.handlePaymentWebhook(signature, timestamp, requestBody);
