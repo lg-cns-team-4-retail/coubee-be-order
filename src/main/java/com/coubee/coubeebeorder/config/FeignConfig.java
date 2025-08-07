@@ -27,6 +27,12 @@ public class FeignConfig {
             requestTemplate.header("Accept", "application/json");
             
             String apiSecret = portOneProperties.getApiSecret();
+
+            if (apiSecret != null) {
+                log.info("[SECRET_DEBUG] Loaded API Secret starts with: {}", apiSecret.substring(0, Math.min(apiSecret.length(), 8)));
+            } else {
+                log.error("[SECRET_DEBUG] API Secret is NULL!");
+            }
             
             if (apiSecret == null || apiSecret.trim().isEmpty()) {
                 log.error("PortOne API Secret is not configured. Cannot make API calls.");
