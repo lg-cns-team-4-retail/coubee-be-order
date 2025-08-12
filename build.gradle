@@ -87,7 +87,7 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
-    // Iamport 결제 라이브러리
+    // 포트원 결제 라이브러리
     implementation 'io.portone:server-sdk:0.19.2' 
     
     // Test
