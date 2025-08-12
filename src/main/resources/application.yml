@@ -2,6 +2,12 @@ spring:
   application:
     name: coubee-be-order
 
+# Logging configuration
+logging:
+  level:
+    com.coubee.coubeebeorder.remote.client: DEBUG
+    feign: DEBUG
+
 
 
   kafka:

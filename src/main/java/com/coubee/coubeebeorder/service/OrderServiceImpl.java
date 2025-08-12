@@ -1,5 +1,6 @@
 package com.coubee.coubeebeorder.service;
 
+import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.common.exception.ApiError;
 import com.coubee.coubeebeorder.common.exception.InvalidStatusTransitionException;
 import com.coubee.coubeebeorder.common.exception.NotFound;
@@ -8,8 +9,11 @@ import com.coubee.coubeebeorder.domain.dto.*;
 import com.coubee.coubeebeorder.domain.event.OrderEvent;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.event.producer.KafkaMessageProducer;
+import com.coubee.coubeebeorder.remote.client.ProductServiceClient;
+import com.coubee.coubeebeorder.remote.dto.ProductResponseDto;
 // import io.portone.sdk.server.payment.CancelPaymentRequest; // Not available in current SDK version
 import io.portone.sdk.server.payment.PaymentClient;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -17,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -31,6 +36,7 @@ public class OrderServiceImpl implements OrderService {
     private final KafkaMessageProducer kafkaMessageProducer;
     // ✅✅✅ FeignClient 대신 공식 SDK 클라이언트를 주입받습니다. ✅✅✅
     private final PaymentClient portonePaymentClient;
+    private final ProductServiceClient productServiceClient;
 
     @Override
     @Transactional
@@ -39,23 +45,66 @@ public class OrderServiceImpl implements OrderService {
 
         String orderId = "order_" + UUID.randomUUID().toString().replace("-", "");
 
-        // This is a placeholder. In a real application, you'd fetch product info.
-        int totalAmount = request.getItems().stream()
-                .mapToInt(item -> item.getQuantity() * 1000)
-                .sum();
+        // First, fetch all product information and calculate total amount
+        int totalAmount = 0;
+        List<ProductResponseDto> productDetails = new ArrayList<>();
 
+        for (OrderCreateRequest.OrderItemRequest itemRequest : request.getItems()) {
+            try {
+                // Call product service to get product details
+                log.debug("Fetching product details for productId: {}", itemRequest.getProductId());
+                ApiResponseDto<ProductResponseDto> productResponse = productServiceClient.getProductById(
+                        itemRequest.getProductId(), userId);
+
+                if (productResponse == null || productResponse.getData() == null) {
+                    throw new NotFound("Product not found: " + itemRequest.getProductId());
+                }
+
+                ProductResponseDto product = productResponse.getData();
+
+                // Check if product has sufficient stock
+                if (product.getStock() < itemRequest.getQuantity()) {
+                    throw new ApiError("Insufficient stock for product: " + product.getProductName() +
+                                     ". Available: " + product.getStock() + ", Requested: " + itemRequest.getQuantity());
+                }
+
+                // Use salePrice for calculations
+                int itemTotalPrice = product.getSalePrice() * itemRequest.getQuantity();
+                totalAmount += itemTotalPrice;
+
+                productDetails.add(product);
+
+                log.debug("Validated product: productId={}, productName={}, quantity={}, price={}, itemTotal={}",
+                         product.getProductId(), product.getProductName(), itemRequest.getQuantity(),
+                         product.getSalePrice(), itemTotalPrice);
+
+            } catch (FeignException.NotFound e) {
+                log.error("Product not found: productId={}", itemRequest.getProductId());
+                throw new NotFound("Product not found: " + itemRequest.getProductId());
+            } catch (FeignException e) {
+                log.error("Failed to fetch product details: productId={}, error={}",
+                         itemRequest.getProductId(), e.getMessage());
+                throw new ApiError("Failed to fetch product details for product: " + itemRequest.getProductId());
+            }
+        }
+
+        // Create order with the calculated total amount
         Order order = Order.createOrder(
                 orderId, userId, request.getStoreId(), totalAmount, request.getRecipientName());
 
-        request.getItems().forEach(itemRequest -> {
+        // Add order items with real product data
+        for (int i = 0; i < request.getItems().size(); i++) {
+            OrderCreateRequest.OrderItemRequest itemRequest = request.getItems().get(i);
+            ProductResponseDto product = productDetails.get(i);
+
             OrderItem orderItem = OrderItem.createOrderItem(
                     itemRequest.getProductId(),
-                    "Product " + itemRequest.getProductId(), // Placeholder
+                    product.getProductName(),
                     itemRequest.getQuantity(),
-                    1000 // Placeholder
+                    product.getSalePrice()
             );
             order.addOrderItem(orderItem);
-        });
+        }
 
         orderRepository.save(order);
 
