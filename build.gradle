@@ -31,7 +31,7 @@ repositories {
 }
 
 ext {
-    set('springCloudVersion', "2025.0.0-RC1")
+    set('springCloudVersion', "2024.0.0")
 }
 
 dependencies {
@@ -97,7 +97,7 @@ dependencies {
     // WireMock
     testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-stub-runner'
     testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-verifier'
-    testImplementation 'org.wiremock:wiremock-standalone:3.0.1'
+    testImplementation 'com.github.tomakehurst:wiremock-jre8:2.35.0'
     
     
     // Embedded Kafka

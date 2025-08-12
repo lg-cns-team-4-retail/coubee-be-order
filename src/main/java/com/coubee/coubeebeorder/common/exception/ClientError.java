@@ -5,4 +5,7 @@ import lombok.NoArgsConstructor;
 
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ClientError extends ApiError {
+    public ClientError(String message) {
+        super(message);
+    }
 }

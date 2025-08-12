@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
 @Entity
 @Table(name = "payments")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class Payment extends BaseTimeEntity {
 
     @Id
@@ -95,5 +97,17 @@ public class Payment extends BaseTimeEntity {
 
     public void updateCancelledStatus() {
         this.status = PaymentStatus.CANCELLED;
+    }
+
+    public void updateStatus(PaymentStatus status) {
+        this.status = status;
+    }
+
+    public void updatePgTransactionId(String pgTransactionId) {
+        this.pgTransactionId = pgTransactionId;
+    }
+
+    public void updatePaidAt(LocalDateTime paidAt) {
+        this.paidAt = paidAt;
     }
 }

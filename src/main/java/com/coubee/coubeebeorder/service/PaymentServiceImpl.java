@@ -18,6 +18,7 @@ import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.portone.sdk.server.payment.PaymentClient;
+import io.portone.sdk.server.payment.PaymentMethod;
 import io.portone.sdk.server.payment.PaidPayment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.time.LocalDateTime;
 
 @Slf4j // ✅ [추가] @Slf4j 어노테이션 추가
 @Service
@@ -211,22 +213,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
-    private String extractPgProvider(io.portone.sdk.server.payment.PaymentMethod method) {
-        if (method == null) {
-            return "unknown";
-        }
-        
-        // PaymentMethod는 union type이므로 타입별로 처리
-        try {
-            // 임시로 toString()을 사용하여 타입 정보 추출
-            String methodType = method.getClass().getSimpleName();
-            log.debug("PaymentMethod type: {}", methodType);
-            return methodType.toLowerCase().replace("paymentmethod", "");
-        } catch (Exception e) {
-            log.warn("Failed to extract PG provider from PaymentMethod: {}", e.getMessage());
-            return "unknown";
-        }
-    }
+    
 
     private boolean processWebhookBasedPayment(String merchantUid, String transactionId, PortoneWebhookPayload payload) {
         try {
@@ -237,18 +224,16 @@ public class PaymentServiceImpl implements PaymentService {
                     .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + merchantUid));
             
             // 결제 정보 조회 또는 생성
-            Payment payment = paymentRepository.findByOrderId(merchantUid)
+            Payment payment = paymentRepository.findByOrder_OrderId(merchantUid)
                     .orElseGet(() -> {
                         log.info("결제 정보가 없어 새로 생성합니다: {}", merchantUid);
-                        return Payment.builder()
-                                .orderId(merchantUid)
-                                .paymentId(merchantUid)
-                                .storeId(order.getStoreId())
-                                .amount(order.getTotalAmount())
-                                .status(PaymentStatus.READY)
-                                .method("UNKNOWN") // 웹훅에서는 상세 정보 제한적
-                                .pgProvider("KAKAOPAY") // 테스트에서 카카오페이 사용
-                                .build();
+                        Payment newPayment = Payment.createPayment(
+                                merchantUid,
+                                order,
+                                "UNKNOWN", // 웹훅에서는 상세 정보 제한적
+                                order.getTotalAmount()
+                        );
+                        return paymentRepository.save(newPayment);
                     });
             
             // 결제 상태 업데이트
@@ -272,6 +257,10 @@ public class PaymentServiceImpl implements PaymentService {
             log.error("웹훅 기반 결제 처리 중 오류 발생 - merchantUid: {}, transactionId: {}", merchantUid, transactionId, e);
             return false;
         }
+    }
+
+    private void publishPaymentCompletedEvent(Order order, Payment payment) {
+        // Implement event publishing logic here
     }
 
     private String extractPgProvider(PaymentMethod paymentMethod) {
