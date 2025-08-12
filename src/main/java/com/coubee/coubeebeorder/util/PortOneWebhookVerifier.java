@@ -1,6 +1,6 @@
 package com.coubee.coubeebeorder.util;
 
-import io.portone.sdk.server.webhook.Webhook;
+import com.coubee.coubeebeorder.config.PortOneProperties;
 import io.portone.sdk.server.webhook.WebhookVerifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +15,8 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class PortOneWebhookVerifier {
 
-    private final WebhookVerifier webhookVerifier; // ✅ 공식 SDK의 Verifier를 주입받음
+    private final WebhookVerifier webhookVerifier;
+    private final PortOneProperties portOneProperties;
 
     public boolean verifyWebhook(String requestBody, String signature, String timestamp) {
         if (signature == null || timestamp == null) {
@@ -24,8 +25,14 @@ public class PortOneWebhookVerifier {
         }
 
         try {
-            // ✅ 공식 SDK의 verify 메소드 사용 - 4개 파라미터 필요
-            webhookVerifier.verify(requestBody, signature, timestamp, "webhook-id");
+            String webhookSecret = portOneProperties.getWebhookSecret();
+            if (webhookSecret == null || webhookSecret.trim().isEmpty()) {
+                log.error("Webhook secret is not configured. Please set portone.v2.webhook-secret in application properties.");
+                return false;
+            }
+            
+            // PortOne SDK의 verify 메소드 사용 - 웹훅 시크릿으로 서명 검증
+            webhookVerifier.verify(webhookSecret, requestBody, signature, timestamp);
             log.info("PortOne webhook signature verified successfully.");
             return true;
         } catch (Exception e) {
