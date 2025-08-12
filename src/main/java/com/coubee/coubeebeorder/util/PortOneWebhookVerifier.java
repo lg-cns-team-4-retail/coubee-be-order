@@ -18,25 +18,32 @@ public class PortOneWebhookVerifier {
     private final WebhookVerifier webhookVerifier;
     private final PortOneProperties portOneProperties;
 
-    public boolean verifyWebhook(String requestBody, String signature, String timestamp) {
+    public boolean verifyWebhook(String requestBody, String webhookId, String signature, String timestamp) {
         if (signature == null || timestamp == null) {
             log.warn("Webhook signature or timestamp is null.");
             return false;
         }
 
         try {
-            String webhookSecret = portOneProperties.getWebhookSecret();
-            if (webhookSecret == null || webhookSecret.trim().isEmpty()) {
-                log.error("Webhook secret is not configured. Please set portone.v2.webhook-secret in application properties.");
-                return false;
-            }
+            // 디버깅을 위한 상세 로깅
+            log.info("[WEBHOOK_DEBUG] Webhook ID: {}", webhookId);
+            log.info("[WEBHOOK_DEBUG] Request body length: {}", requestBody.length());
+            log.info("[WEBHOOK_DEBUG] Signature: {}", signature);
+            log.info("[WEBHOOK_DEBUG] Timestamp: {}", timestamp);
             
-            // PortOne SDK의 verify 메소드 사용 - 웹훅 시크릿으로 서명 검증
-            webhookVerifier.verify(webhookSecret, requestBody, signature, timestamp);
+            // PortOne V2 JVM SDK의 verify 메소드 사용
+            // WebhookVerifier는 생성자에서 이미 시크릿을 받았으므로 여기서는 전달하지 않음
+            // verify(msgBody, msgId, msgSignature, msgTimestamp) 순서
+            webhookVerifier.verify(
+                requestBody,    // msgBody
+                webhookId != null ? webhookId : "",  // msgId (webhook-id)
+                signature,      // msgSignature  
+                timestamp       // msgTimestamp
+            );
             log.info("PortOne webhook signature verified successfully.");
             return true;
         } catch (Exception e) {
-            log.warn("PortOne webhook signature verification failed: {}", e.getMessage());
+            log.error("PortOne webhook signature verification failed: {}", e.getMessage(), e);
             return false;
         }
     }

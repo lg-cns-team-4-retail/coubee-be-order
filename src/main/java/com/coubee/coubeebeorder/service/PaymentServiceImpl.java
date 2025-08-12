@@ -85,7 +85,7 @@ public class PaymentServiceImpl implements PaymentService {
     public boolean handlePaymentWebhook(String webhookId, String signature, String timestamp, String requestBody) {
         String transactionId = "unknown";
         try {
-            if (!webhookVerifier.verifyWebhook(requestBody, signature, timestamp)) {
+            if (!webhookVerifier.verifyWebhook(requestBody, webhookId, signature, timestamp)) {
                 return false;
             }
 
