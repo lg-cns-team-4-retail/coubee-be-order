@@ -43,19 +43,7 @@ public class ApiResponseDto<T> {
         this.success = "OK".equals(code);
     }
 
-    /**
-     * 모든 필드를 지정하여 응답 객체를 생성하는 생성자
-     * @param code 응답 코드
-     * @param message 응답 메시지
-     * @param data 응답 데이터
-     * @param success 성공 여부
-     */
-    private ApiResponseDto(String code, String message, T data, boolean success) {
-        this.code = code;
-        this.message = message;
-        this.data = data;
-        this.success = success;
-    }
+
 
     /**
      * 데이터 생성 성공 응답을 생성하는 정적 팩토리 메서드
@@ -63,7 +51,12 @@ public class ApiResponseDto<T> {
      * @return 성공 응답 객체 (success = true)
      */
     public static <T> ApiResponseDto<T> createOk(T data) {
-        return new ApiResponseDto<>("OK", "데이터 생성 요청이 성공하였습니다.", data, true);
+        return ApiResponseDto.<T>builder()
+                .code("OK")
+                .message("데이터 생성 요청이 성공하였습니다.")
+                .data(data)
+                .success(true)
+                .build();
     }
 
     /**
@@ -72,7 +65,12 @@ public class ApiResponseDto<T> {
      * @return 성공 응답 객체 (success = true)
      */
     public static <T> ApiResponseDto<T> readOk(T data) {
-        return new ApiResponseDto<>("OK", "데이터 조회 요청이 성공하였습니다.", data, true);
+        return ApiResponseDto.<T>builder()
+                .code("OK")
+                .message("데이터 조회 요청이 성공하였습니다.")
+                .data(data)
+                .success(true)
+                .build();
     }
 
     /**
@@ -81,7 +79,12 @@ public class ApiResponseDto<T> {
      * @return 성공 응답 객체 (success = true)
      */
     public static <T> ApiResponseDto<T> updateOk(T data) {
-        return new ApiResponseDto<>("OK", "데이터 수정 요청이 성공하였습니다.", data, true);
+        return ApiResponseDto.<T>builder()
+                .code("OK")
+                .message("데이터 수정 요청이 성공하였습니다.")
+                .data(data)
+                .success(true)
+                .build();
     }
 
     /**
@@ -91,7 +94,12 @@ public class ApiResponseDto<T> {
      * @return 성공 응답 객체 (success = true)
      */
     public static <T> ApiResponseDto<T> updateOk(T data, String message) {
-        return new ApiResponseDto<>("OK", message, data, true);
+        return ApiResponseDto.<T>builder()
+                .code("OK")
+                .message(message)
+                .data(data)
+                .success(true)
+                .build();
     }
 
     /**
@@ -109,7 +117,12 @@ public class ApiResponseDto<T> {
      * @return 에러 응답 객체 (success = false)
      */
     public static ApiResponseDto<String> createError(String code, String message) {
-        return new ApiResponseDto<>(code, message, null, false);
+        return ApiResponseDto.<String>builder()
+                .code(code)
+                .message(message)
+                .data(null)
+                .success(false)
+                .build();
     }
 
     /**
@@ -120,6 +133,11 @@ public class ApiResponseDto<T> {
      * @return 에러 응답 객체 (success = false)
      */
     public static <T> ApiResponseDto<T> createError(String code, String message, T data) {
-        return new ApiResponseDto<>(code, message, data, false);
+        return ApiResponseDto.<T>builder()
+                .code(code)
+                .message(message)
+                .data(data)
+                .success(false)
+                .build();
     }
 }
