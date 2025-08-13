@@ -46,6 +46,9 @@ public class Order extends BaseTimeEntity {
     @Column(name = "order_qr", columnDefinition = "TEXT")
     private String orderQR;
 
+    @Column(name = "paid_at_unix")
+    private Long paidAtUnix;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -53,7 +56,7 @@ public class Order extends BaseTimeEntity {
     private Payment payment;
 
     @Builder
-    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer totalAmount, String recipientName, String orderToken, String orderQR) {
+    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer totalAmount, String recipientName, String orderToken, String orderQR, Long paidAtUnix) {
         this.orderId = orderId;
         this.userId = userId;
         this.storeId = storeId;
@@ -62,6 +65,7 @@ public class Order extends BaseTimeEntity {
         this.recipientName = recipientName;
         this.orderToken = orderToken;
         this.orderQR = orderQR;
+        this.paidAtUnix = paidAtUnix;
     }
 
     public static Order createOrder(String orderId, Long userId, Long storeId, Integer totalAmount, String recipientName) {
@@ -94,5 +98,22 @@ public class Order extends BaseTimeEntity {
 
     public void setOrderQR(String orderQR) {
         this.orderQR = orderQR;
+    }
+
+    /**
+     * 결제 완료 시점을 UNIX 타임스탬프로 설정합니다.
+     * QR 코드 스캔으로 주문이 결제 완료된 시점을 기록합니다.
+     *
+     * @param paidAtUnix 결제 완료 시점의 UNIX 타임스탬프
+     */
+    public void setPaidAtUnix(Long paidAtUnix) {
+        this.paidAtUnix = paidAtUnix;
+    }
+
+    /**
+     * 현재 시점을 결제 완료 시점으로 설정합니다.
+     */
+    public void markAsPaidNow() {
+        this.paidAtUnix = System.currentTimeMillis() / 1000L;
     }
 }

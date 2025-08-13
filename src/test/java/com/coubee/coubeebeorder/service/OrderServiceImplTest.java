@@ -1,8 +1,11 @@
 package com.coubee.coubeebeorder.service;
 
 import com.coubee.coubeebeorder.common.exception.NotFound;
+import com.coubee.coubeebeorder.domain.EventType;
 import com.coubee.coubeebeorder.domain.Order;
+import com.coubee.coubeebeorder.domain.OrderItem;
 import com.coubee.coubeebeorder.domain.OrderStatus;
+import com.coubee.coubeebeorder.domain.dto.OrderDetailResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +48,35 @@ class OrderServiceImplTest {
         assertThat(result).isNotNull();
         assertThat(result.getOrderId()).isEqualTo(orderId);
         assertThat(result.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("V3: 결제 완료된 주문 상세 조회 - paidAtUnix 포함")
+    void getOrder_V3_결제완료된주문_paidAtUnix포함() {
+        // Given
+        String orderId = "order_test_123";
+        Order order = Order.createOrder(orderId, 1L, 1L, 10000, "Test User");
+        order.updateStatus(OrderStatus.PAID);
+        order.markAsPaidNow(); // V3: 결제 완료 시점 설정
+
+        OrderItem orderItem = OrderItem.createOrderItem(1L, "테스트 상품", 2, 5000);
+        orderItem.updateEventType(EventType.PURCHASE); // V3: 이벤트 타입 설정
+        order.addOrderItem(orderItem);
+
+        given(orderRepository.findByOrderId(orderId)).willReturn(Optional.of(order));
+
+        // When
+        OrderDetailResponse result = orderService.getOrder(orderId);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getOrderId()).isEqualTo(orderId);
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(result.getPaidAtUnix()).isNotNull(); // V3: 결제 완료 시점 검증
+        assertThat(result.getPaidAtUnix()).isGreaterThan(0L);
+
+        assertThat(result.getItems()).hasSize(1);
+        assertThat(result.getItems().get(0).getEventType()).isEqualTo("PURCHASE"); // V3: 이벤트 타입 검증
     }
 
     @Test

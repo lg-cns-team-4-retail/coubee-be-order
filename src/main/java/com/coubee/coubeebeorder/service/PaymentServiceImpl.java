@@ -2,6 +2,7 @@ package com.coubee.coubeebeorder.service;
 
 import com.coubee.coubeebeorder.common.exception.ApiError;
 import com.coubee.coubeebeorder.common.exception.NotFound;
+import com.coubee.coubeebeorder.domain.EventType;
 import com.coubee.coubeebeorder.domain.Order;
 import com.coubee.coubeebeorder.domain.OrderItem;
 import com.coubee.coubeebeorder.domain.OrderStatus;
@@ -167,6 +168,12 @@ public class PaymentServiceImpl implements PaymentService {
         );
         order.updateStatus(OrderStatus.PAID);
 
+        // V3: 결제 완료 시점을 UNIX 타임스탬프로 설정
+        order.markAsPaidNow();
+
+        // V3: 모든 주문 아이템의 이벤트 타입을 PURCHASE로 설정
+        order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
+
         publishStockDecreaseEvent(order);
 
         log.info("결제 성공 처리 완료: 주문 ID {}", merchantUid);
@@ -245,8 +252,15 @@ public class PaymentServiceImpl implements PaymentService {
             
             // 주문 상태 업데이트
             order.updateStatus(OrderStatus.PAID);
+
+            // V3: 결제 완료 시점을 UNIX 타임스탬프로 설정
+            order.markAsPaidNow();
+
+            // V3: 모든 주문 아이템의 이벤트 타입을 PURCHASE로 설정
+            order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
+
             orderRepository.save(order);
-            
+
             // Kafka 이벤트 발행
             publishPaymentCompletedEvent(order, payment);
             

@@ -1,7 +1,7 @@
 package com.coubee.data;
 
-import com.coubee.domain.*;
-import com.coubee.dto.request.OrderCreateRequest;
+import com.coubee.coubeebeorder.domain.*;
+import com.coubee.coubeebeorder.domain.dto.OrderCreateRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -58,12 +58,38 @@ public class 테스트데이터_팩토리 {
     public static class 매장정보 {
         public static final Long 매장1_ID = 1L;
         public static final String 매장1_이름 = "테스트 매장 1";
-        
+
         public static final Long 매장2_ID = 2L;
         public static final String 매장2_이름 = "테스트 매장 2";
-        
+
         public static final Long 매장3_ID = 3L;
         public static final String 매장3_이름 = "테스트 매장 3";
+    }
+
+    // V3: 테스트용 이벤트 타입 정보
+    public static class 이벤트타입정보 {
+        public static final EventType 구매 = EventType.PURCHASE;
+        public static final EventType 환불 = EventType.REFUND;
+        public static final EventType 교환 = EventType.EXCHANGE;
+        public static final EventType 선물 = EventType.GIFT;
+
+        public static EventType 랜덤_이벤트타입() {
+            EventType[] 이벤트타입들 = {구매, 환불, 교환, 선물};
+            return 이벤트타입들[random.nextInt(이벤트타입들.length)];
+        }
+    }
+
+    // V3: 테스트용 UNIX 타임스탬프 정보
+    public static class 시간정보 {
+        public static final Long 현재시점_UNIX = System.currentTimeMillis() / 1000L;
+        public static final Long 과거시점_UNIX = 현재시점_UNIX - 86400L; // 1일 전
+        public static final Long 미래시점_UNIX = 현재시점_UNIX + 86400L; // 1일 후
+
+        public static Long 랜덤_과거시점_UNIX() {
+            // 1일 ~ 30일 전 사이의 랜덤한 시점
+            long 일수 = random.nextInt(30) + 1;
+            return 현재시점_UNIX - (일수 * 86400L);
+        }
     }
     
     /**
@@ -206,12 +232,53 @@ public class 테스트데이터_팩토리 {
      */
     public static OrderItem 테스트_주문아이템_엔티티(Order 주문) {
         return OrderItem.createOrderItem(
-                주문,
                 상품정보.상품1_ID,
                 상품정보.상품1_이름,
                 1,
                 상품정보.상품1_가격
         );
+    }
+
+    /**
+     * V3: 이벤트 타입을 지정한 주문 아이템 엔티티 생성
+     */
+    public static OrderItem 테스트_주문아이템_엔티티_이벤트타입포함(Order 주문, EventType 이벤트타입) {
+        return OrderItem.createOrderItemWithEventType(
+                상품정보.상품1_ID,
+                상품정보.상품1_이름,
+                1,
+                상품정보.상품1_가격,
+                이벤트타입
+        );
+    }
+
+    /**
+     * V3: 결제 완료된 주문 엔티티 생성 (paidAtUnix 포함)
+     */
+    public static Order 테스트_결제완료_주문_엔티티() {
+        Order 주문 = 테스트_주문_엔티티();
+        주문.updateStatus(OrderStatus.PAID);
+        주문.markAsPaidNow(); // 현재 시점으로 결제 완료 시점 설정
+
+        // 주문 아이템에 PURCHASE 이벤트 타입 설정
+        OrderItem 아이템 = 테스트_주문아이템_엔티티_이벤트타입포함(주문, EventType.PURCHASE);
+        주문.addOrderItem(아이템);
+
+        return 주문;
+    }
+
+    /**
+     * V3: 취소된 주문 엔티티 생성 (REFUND 이벤트 타입 포함)
+     */
+    public static Order 테스트_취소된_주문_엔티티() {
+        Order 주문 = 테스트_주문_엔티티();
+        주문.updateStatus(OrderStatus.CANCELLED);
+
+        // 주문 아이템에 REFUND 이벤트 타입 설정
+        OrderItem 아이템 = 테스트_주문아이템_엔티티_이벤트타입포함(주문, EventType.REFUND);
+        주문.addOrderItem(아이템);
+
+        return 주문;
     }
     
     /**

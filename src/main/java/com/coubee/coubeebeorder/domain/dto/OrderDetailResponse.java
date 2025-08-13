@@ -39,6 +39,9 @@ public class OrderDetailResponse {
     @Schema(description = "Order creation time", example = "2023-06-01T14:30:00")
     private LocalDateTime createdAt;
 
+    @Schema(description = "Payment completion time (UNIX timestamp)", example = "1672531200")
+    private Long paidAtUnix;
+
     @Schema(description = "Order item list")
     private List<OrderItemResponse> items;
 
@@ -62,6 +65,9 @@ public class OrderDetailResponse {
 
         @Schema(description = "Total product price", example = "200")
         private Integer totalPrice;
+
+        @Schema(description = "Event type", example = "PURCHASE", allowableValues = {"PURCHASE", "REFUND", "EXCHANGE", "GIFT"})
+        private String eventType;
     }
 
     @Getter

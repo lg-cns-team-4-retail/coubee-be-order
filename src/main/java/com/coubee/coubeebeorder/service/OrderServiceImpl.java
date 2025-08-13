@@ -156,6 +156,9 @@ public class OrderServiceImpl implements OrderService {
 
         order.updateStatus(OrderStatus.CANCELLED);
 
+        // V3: 주문 취소 시 모든 주문 아이템의 이벤트 타입을 REFUND로 설정
+        order.getItems().forEach(item -> item.updateEventType(EventType.REFUND));
+
         publishStockIncreaseEvent(order);
 
         log.info("Order cancelled successfully: {}", orderId);
@@ -315,12 +318,15 @@ public class OrderServiceImpl implements OrderService {
                 .recipientName(order.getRecipientName())
                 .orderToken(order.getOrderToken())
                 .orderQR(order.getOrderQR())
+                .paidAtUnix(order.getPaidAtUnix()) // V3: 결제 완료 시점 UNIX 타임스탬프 추가
                 .items(order.getItems().stream()
                         .map(item -> OrderDetailResponse.OrderItemResponse.builder()
                                 .productId(item.getProductId())
                                 .productName(item.getProductName())
                                 .quantity(item.getQuantity())
                                 .price(item.getPrice())
+                                .totalPrice(item.getTotalPrice())
+                                .eventType(item.getEventType() != null ? item.getEventType().name() : null) // V3: 이벤트 타입 추가
                                 .build())
                         .collect(Collectors.toList()))
                 .payment(order.getPayment() != null ?
