@@ -11,10 +11,11 @@ import com.coubee.coubeebeorder.domain.Payment;
 import com.coubee.coubeebeorder.domain.PaymentStatus;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyRequest;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyResponse;
-import com.coubee.coubeebeorder.domain.event.OrderEvent;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.domain.repository.PaymentRepository;
-import com.coubee.coubeebeorder.event.producer.KafkaMessageProducer;
+import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
+import com.coubee.coubeebeorder.kafka.producer.product.event.StockDecreaseEvent;
+import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.time.LocalDateTime;
@@ -202,21 +204,32 @@ public class PaymentServiceImpl implements PaymentService {
 
     private void publishStockDecreaseEvent(Order order) {
         try {
-            OrderEvent stockDecreaseEvent = OrderEvent.builder()
-                    .eventId(UUID.randomUUID().toString())
-                    .eventType("STOCK_DECREASE")
-                    .orderId(order.getOrderId())
-                    .userId(order.getUserId())
-                    .items(order.getItems().stream()
-                            .map(item -> OrderEvent.OrderItemEvent.builder()
-                                    .productId(item.getProductId())
-                                    .quantity(item.getQuantity())
-                                    .build())
-                            .toList())
-                    .build();
-            kafkaMessageProducer.publishOrderEvent(stockDecreaseEvent);
+            // 새로운 이벤트 구조로 재고 감소 이벤트 생성
+            List<StockDecreaseEvent.StockItem> stockItems = order.getItems().stream()
+                    .map(item -> StockDecreaseEvent.StockItem.builder()
+                            .productId(item.getProductId())
+                            .quantity(item.getQuantity())
+                            .build())
+                    .toList();
+
+            StockDecreaseEvent stockDecreaseEvent = StockDecreaseEvent.create(
+                    order.getOrderId(),
+                    order.getUserId(),
+                    stockItems
+            );
+
+            kafkaMessageProducer.publishStockDecreaseEvent(stockDecreaseEvent);
+            log.info("재고 감소 이벤트 발행 완료 - 결제 완료: {}", order.getOrderId());
+
+            // 주문 완료 알림 이벤트도 발행
+            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createOrderCompleted(
+                    order.getOrderId(),
+                    order.getUserId()
+            );
+            kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
+
         } catch (Exception e) {
-            log.error("Failed to publish stock decrease event for order: {}", order.getOrderId(), e);
+            log.error("재고 감소 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
         }
     }
 

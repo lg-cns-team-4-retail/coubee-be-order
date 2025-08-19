@@ -5,7 +5,7 @@ spring:
 # Logging configuration
 logging:
   level:
-    com.coubee.coubeebeorder.remote.client: DEBUG
+    com.coubee.coubeebeorder.remote.product: DEBUG
     feign: DEBUG
 
 

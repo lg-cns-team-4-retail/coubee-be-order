@@ -3,8 +3,8 @@ package com.coubee.coubeebeorder.service;
 import com.coubee.coubeebeorder.domain.*;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.domain.repository.PaymentRepository;
-import com.coubee.coubeebeorder.event.producer.KafkaMessageProducer;
-import com.coubee.coubeebeorder.remote.client.ProductServiceClient;
+import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
+import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.portone.sdk.server.payment.PaymentClient;
@@ -44,7 +44,7 @@ class V3PaymentServiceTest {
     private KafkaMessageProducer kafkaMessageProducer;
 
     @Mock
-    private ProductServiceClient productServiceClient;
+    private ProductClient productClient;
 
     @Mock
     private PortOneWebhookVerifier portOneWebhookVerifier;

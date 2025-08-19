@@ -6,10 +6,11 @@ import com.coubee.coubeebeorder.common.exception.InvalidStatusTransitionExceptio
 import com.coubee.coubeebeorder.common.exception.NotFound;
 import com.coubee.coubeebeorder.domain.*;
 import com.coubee.coubeebeorder.domain.dto.*;
-import com.coubee.coubeebeorder.domain.event.OrderEvent;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
-import com.coubee.coubeebeorder.event.producer.KafkaMessageProducer;
-import com.coubee.coubeebeorder.remote.client.ProductServiceClient;
+import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
+import com.coubee.coubeebeorder.kafka.producer.product.event.StockIncreaseEvent;
+import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
+import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.dto.ProductResponseDto;
 // import io.portone.sdk.server.payment.CancelPaymentRequest; // Not available in current SDK version
 import io.portone.sdk.server.payment.PaymentClient;
@@ -36,7 +37,7 @@ public class OrderServiceImpl implements OrderService {
     private final KafkaMessageProducer kafkaMessageProducer;
     // ✅✅✅ FeignClient 대신 공식 SDK 클라이언트를 주입받습니다. ✅✅✅
     private final PaymentClient portonePaymentClient;
-    private final ProductServiceClient productServiceClient;
+    private final ProductClient productClient;
 
     @Override
     @Transactional
@@ -53,7 +54,7 @@ public class OrderServiceImpl implements OrderService {
             try {
                 // Call product service to get product details
                 log.debug("Fetching product details for productId: {}", itemRequest.getProductId());
-                ApiResponseDto<ProductResponseDto> productResponse = productServiceClient.getProductById(
+                ApiResponseDto<ProductResponseDto> productResponse = productClient.getProductById(
                         itemRequest.getProductId(), userId);
 
                 if (productResponse == null || productResponse.getData() == null) {
@@ -275,23 +276,32 @@ public class OrderServiceImpl implements OrderService {
 
     private void publishStockIncreaseEvent(Order order) {
         try {
-            OrderEvent stockIncreaseEvent = OrderEvent.builder()
-                    .eventId(UUID.randomUUID().toString())
-                    .eventType("STOCK_INCREASE")
-                    .orderId(order.getOrderId())
-                    .userId(order.getUserId())
-                    .items(order.getItems().stream()
-                            .map(item -> OrderEvent.OrderItemEvent.builder()
-                                    .productId(item.getProductId())
-                                    .quantity(item.getQuantity())
-                                    .build())
-                            .toList())
-                    .build();
+            // 새로운 이벤트 구조로 재고 증가 이벤트 생성
+            List<StockIncreaseEvent.StockItem> stockItems = order.getItems().stream()
+                    .map(item -> StockIncreaseEvent.StockItem.builder()
+                            .productId(item.getProductId())
+                            .quantity(item.getQuantity())
+                            .build())
+                    .toList();
 
-            kafkaMessageProducer.publishOrderEvent(stockIncreaseEvent);
-            log.info("Stock increase event published for cancelled order: {}", order.getOrderId());
+            StockIncreaseEvent stockIncreaseEvent = StockIncreaseEvent.create(
+                    order.getOrderId(),
+                    order.getUserId(),
+                    stockItems
+            );
+
+            kafkaMessageProducer.publishStockIncreaseEvent(stockIncreaseEvent);
+            log.info("재고 증가 이벤트 발행 완료 - 주문 취소: {}", order.getOrderId());
+
+            // 주문 취소 알림 이벤트도 발행
+            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createOrderCancelled(
+                    order.getOrderId(),
+                    order.getUserId()
+            );
+            kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
+
         } catch (Exception e) {
-            log.error("Failed to publish stock increase event for order: {}", order.getOrderId(), e);
+            log.error("재고 증가 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
         }
     }
 
