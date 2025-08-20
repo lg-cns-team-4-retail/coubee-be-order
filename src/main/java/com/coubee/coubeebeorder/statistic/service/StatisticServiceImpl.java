@@ -27,28 +27,42 @@ public class StatisticServiceImpl implements StatisticService {
         log.info("Getting daily statistics for date: {}, storeId: {}", date, storeId);
 
         try {
-            // Get current day's statistics
-            DailyStatisticDto todayStats = statisticRepository.getDailyStatistic(date, storeId);
+            // Get current day's order aggregation data
+            StatisticRepository.OrderAggregationResult todayOrderStats =
+                statisticRepository.getOrderAggregation(date, date, storeId);
 
-            // Get previous day's statistics
-            DailyStatisticDto yesterdayStats = statisticRepository.getDailyStatistic(date.minusDays(1), storeId);
+            // Get current day's item count
+            int todayItemCount = statisticRepository.getTotalItemCount(date, date, storeId);
+
+            // Get peak hour information
+            StatisticRepository.PeakHourResult peakHour =
+                statisticRepository.getPeakHour(date, storeId);
+
+            // Calculate average order amount
+            long averageOrderAmount = todayOrderStats.getTotalOrderCount() > 0
+                ? todayOrderStats.getTotalSalesAmount() / todayOrderStats.getTotalOrderCount()
+                : 0;
+
+            // Get previous day's statistics for change rate calculation
+            StatisticRepository.OrderAggregationResult yesterdayOrderStats =
+                statisticRepository.getOrderAggregation(date.minusDays(1), date.minusDays(1), storeId);
 
             // Calculate change rate
             double changeRate = calculatePercentageChange(
-                todayStats.getTotalSalesAmount(),
-                yesterdayStats.getTotalSalesAmount()
+                todayOrderStats.getTotalSalesAmount(),
+                yesterdayOrderStats.getTotalSalesAmount()
             );
 
-            // Return DTO with the new field
+            // Create result DTO
             DailyStatisticDto result = DailyStatisticDto.builder()
-                    .date(todayStats.getDate())
-                    .totalSalesAmount(todayStats.getTotalSalesAmount())
-                    .totalOrderCount(todayStats.getTotalOrderCount())
-                    .totalItemCount(todayStats.getTotalItemCount())
-                    .averageOrderAmount(todayStats.getAverageOrderAmount())
-                    .uniqueCustomerCount(todayStats.getUniqueCustomerCount())
-                    .peakHour(todayStats.getPeakHour())
-                    .peakHourSalesAmount(todayStats.getPeakHourSalesAmount())
+                    .date(date)
+                    .totalSalesAmount(todayOrderStats.getTotalSalesAmount())
+                    .totalOrderCount(todayOrderStats.getTotalOrderCount())
+                    .totalItemCount(todayItemCount)
+                    .averageOrderAmount(averageOrderAmount)
+                    .uniqueCustomerCount(todayOrderStats.getUniqueCustomerCount())
+                    .peakHour(peakHour.getHour())
+                    .peakHourSalesAmount(peakHour.getSalesAmount())
                     .changeRate(changeRate)
                     .build();
 
@@ -66,30 +80,50 @@ public class StatisticServiceImpl implements StatisticService {
         log.info("Getting weekly statistics for week starting: {}, storeId: {}", weekStartDate, storeId);
 
         try {
-            // Get current week's statistics
-            WeeklyStatisticDto currentWeekStats = statisticRepository.getWeeklyStatistic(weekStartDate, storeId);
+            LocalDate weekEndDate = weekStartDate.plusDays(6);
 
-            // Get previous week's statistics
-            WeeklyStatisticDto previousWeekStats = statisticRepository.getWeeklyStatistic(weekStartDate.minusWeeks(1), storeId);
+            // Get current week's order aggregation data
+            StatisticRepository.OrderAggregationResult currentWeekOrderStats =
+                statisticRepository.getOrderAggregation(weekStartDate, weekEndDate, storeId);
+
+            // Get current week's item count
+            int currentWeekItemCount = statisticRepository.getTotalItemCount(weekStartDate, weekEndDate, storeId);
+
+            // Get best performing day
+            StatisticRepository.BestDayResult bestDay =
+                statisticRepository.getBestPerformingDay(weekStartDate, weekEndDate, storeId);
+
+            // Get daily breakdown
+            List<WeeklyStatisticDto.DailyBreakdown> dailyBreakdown =
+                statisticRepository.getDailyBreakdown(weekStartDate, weekEndDate, storeId);
+
+            // Calculate average daily sales
+            long averageDailySalesAmount = currentWeekOrderStats.getTotalSalesAmount() / 7;
+
+            // Get previous week's statistics for change rate calculation
+            LocalDate previousWeekStartDate = weekStartDate.minusWeeks(1);
+            LocalDate previousWeekEndDate = previousWeekStartDate.plusDays(6);
+            StatisticRepository.OrderAggregationResult previousWeekOrderStats =
+                statisticRepository.getOrderAggregation(previousWeekStartDate, previousWeekEndDate, storeId);
 
             // Calculate change rate
             double changeRate = calculatePercentageChange(
-                currentWeekStats.getTotalSalesAmount(),
-                previousWeekStats.getTotalSalesAmount()
+                currentWeekOrderStats.getTotalSalesAmount(),
+                previousWeekOrderStats.getTotalSalesAmount()
             );
 
-            // Return DTO with the new field
+            // Create result DTO
             WeeklyStatisticDto result = WeeklyStatisticDto.builder()
-                    .weekStartDate(currentWeekStats.getWeekStartDate())
-                    .weekEndDate(currentWeekStats.getWeekEndDate())
-                    .totalSalesAmount(currentWeekStats.getTotalSalesAmount())
-                    .totalOrderCount(currentWeekStats.getTotalOrderCount())
-                    .totalItemCount(currentWeekStats.getTotalItemCount())
-                    .averageDailySalesAmount(currentWeekStats.getAverageDailySalesAmount())
-                    .uniqueCustomerCount(currentWeekStats.getUniqueCustomerCount())
-                    .bestPerformingDay(currentWeekStats.getBestPerformingDay())
-                    .bestDaySalesAmount(currentWeekStats.getBestDaySalesAmount())
-                    .dailyBreakdown(currentWeekStats.getDailyBreakdown())
+                    .weekStartDate(weekStartDate)
+                    .weekEndDate(weekEndDate)
+                    .totalSalesAmount(currentWeekOrderStats.getTotalSalesAmount())
+                    .totalOrderCount(currentWeekOrderStats.getTotalOrderCount())
+                    .totalItemCount(currentWeekItemCount)
+                    .averageDailySalesAmount(averageDailySalesAmount)
+                    .uniqueCustomerCount(currentWeekOrderStats.getUniqueCustomerCount())
+                    .bestPerformingDay(bestDay.getDayOfWeek())
+                    .bestDaySalesAmount(bestDay.getSalesAmount())
+                    .dailyBreakdown(dailyBreakdown)
                     .changeRate(changeRate)
                     .build();
 
@@ -107,41 +141,69 @@ public class StatisticServiceImpl implements StatisticService {
         log.info("Getting monthly statistics for {}-{}, storeId: {}", year, month, storeId);
 
         try {
-            // Get current month's statistics
-            MonthlyStatisticDto currentMonthStats = statisticRepository.getMonthlyStatistic(year, month, storeId);
+            // Calculate month start and end dates
+            LocalDate monthStartDate = LocalDate.of(year, month, 1);
+            LocalDate monthEndDate = monthStartDate.withDayOfMonth(monthStartDate.lengthOfMonth());
 
-            // Calculate previous month's year and month
-            LocalDate currentMonth = LocalDate.of(year, month, 1);
-            LocalDate previousMonth = currentMonth.minusMonths(1);
+            // Get current month's order aggregation data
+            StatisticRepository.OrderAggregationResult currentMonthOrderStats =
+                statisticRepository.getOrderAggregation(monthStartDate, monthEndDate, storeId);
 
-            // Get previous month's statistics
-            MonthlyStatisticDto previousMonthStats = statisticRepository.getMonthlyStatistic(
-                previousMonth.getYear(),
-                previousMonth.getMonthValue(),
-                storeId
-            );
+            // Get current month's item count
+            int currentMonthItemCount = statisticRepository.getTotalItemCount(monthStartDate, monthEndDate, storeId);
+
+            // Get top products
+            List<MonthlyStatisticDto.TopProduct> topProducts =
+                statisticRepository.getTopProducts(year, month, storeId);
+
+            // Get weekly breakdown
+            List<MonthlyStatisticDto.WeeklyBreakdown> weeklyBreakdown =
+                statisticRepository.getWeeklyBreakdown(year, month, storeId);
+
+            // Calculate average daily sales
+            long averageDailySalesAmount = currentMonthOrderStats.getTotalSalesAmount() / monthStartDate.lengthOfMonth();
+
+            // Find best performing week
+            String bestPerformingWeek = "No data";
+            long bestWeekSalesAmount = 0L;
+            if (!weeklyBreakdown.isEmpty()) {
+                MonthlyStatisticDto.WeeklyBreakdown bestWeek = weeklyBreakdown.stream()
+                    .max((w1, w2) -> Long.compare(w1.getSalesAmount(), w2.getSalesAmount()))
+                    .orElse(null);
+                if (bestWeek != null) {
+                    bestPerformingWeek = bestWeek.getWeekStartDate() + " to " + bestWeek.getWeekEndDate();
+                    bestWeekSalesAmount = bestWeek.getSalesAmount();
+                }
+            }
+
+            // Get previous month's statistics for change rate calculation
+            LocalDate previousMonth = monthStartDate.minusMonths(1);
+            LocalDate previousMonthStartDate = previousMonth.withDayOfMonth(1);
+            LocalDate previousMonthEndDate = previousMonth.withDayOfMonth(previousMonth.lengthOfMonth());
+            StatisticRepository.OrderAggregationResult previousMonthOrderStats =
+                statisticRepository.getOrderAggregation(previousMonthStartDate, previousMonthEndDate, storeId);
 
             // Calculate change rate
             double changeRate = calculatePercentageChange(
-                currentMonthStats.getTotalSalesAmount(),
-                previousMonthStats.getTotalSalesAmount()
+                currentMonthOrderStats.getTotalSalesAmount(),
+                previousMonthOrderStats.getTotalSalesAmount()
             );
 
-            // Return DTO with the new field
+            // Create result DTO
             MonthlyStatisticDto result = MonthlyStatisticDto.builder()
-                    .month(currentMonthStats.getMonth())
-                    .monthStartDate(currentMonthStats.getMonthStartDate())
-                    .monthEndDate(currentMonthStats.getMonthEndDate())
-                    .totalSalesAmount(currentMonthStats.getTotalSalesAmount())
-                    .totalOrderCount(currentMonthStats.getTotalOrderCount())
-                    .totalItemCount(currentMonthStats.getTotalItemCount())
-                    .averageDailySalesAmount(currentMonthStats.getAverageDailySalesAmount())
-                    .uniqueCustomerCount(currentMonthStats.getUniqueCustomerCount())
+                    .month(String.format("%04d-%02d", year, month))
+                    .monthStartDate(monthStartDate)
+                    .monthEndDate(monthEndDate)
+                    .totalSalesAmount(currentMonthOrderStats.getTotalSalesAmount())
+                    .totalOrderCount(currentMonthOrderStats.getTotalOrderCount())
+                    .totalItemCount(currentMonthItemCount)
+                    .averageDailySalesAmount(averageDailySalesAmount)
+                    .uniqueCustomerCount(currentMonthOrderStats.getUniqueCustomerCount())
                     .changeRate(changeRate)
-                    .bestPerformingWeek(currentMonthStats.getBestPerformingWeek())
-                    .bestWeekSalesAmount(currentMonthStats.getBestWeekSalesAmount())
-                    .topProducts(currentMonthStats.getTopProducts())
-                    .weeklyBreakdown(currentMonthStats.getWeeklyBreakdown())
+                    .bestPerformingWeek(bestPerformingWeek)
+                    .bestWeekSalesAmount(bestWeekSalesAmount)
+                    .topProducts(topProducts)
+                    .weeklyBreakdown(weeklyBreakdown)
                     .build();
 
             log.info("Successfully retrieved monthly statistics for {}-{}, storeId: {}, total sales: {}, change rate: {}%",
