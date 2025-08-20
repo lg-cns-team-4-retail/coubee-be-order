@@ -42,7 +42,7 @@ WHERE status = 'PAID'
 UPDATE order_items 
 SET event_type = 'PURCHASE'
 WHERE order_id IN (
-    SELECT order_id 
+    SELECT id
     FROM orders 
     WHERE status = 'PAID'
 ) 
