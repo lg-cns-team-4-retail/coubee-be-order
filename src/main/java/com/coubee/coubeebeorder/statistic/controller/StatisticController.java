@@ -28,14 +28,16 @@ public class StatisticController {
             @Parameter(description = "User role from authentication", hidden = true)
             @RequestHeader("X-Auth-Role") String userRole,
             @Parameter(description = "Date for statistics", required = true, example = "2023-06-01")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "Store ID for filtering (optional)", required = false, example = "1")
+            @RequestParam(required = false) Long storeId) {
 
         // Validate user has permission to access statistics
         if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
             throw new IllegalArgumentException("Only admins and super admins can access sales statistics");
         }
 
-        DailyStatisticDto response = statisticService.dailyStatistic(date);
+        DailyStatisticDto response = statisticService.dailyStatistic(date, storeId);
         return ApiResponseDto.readOk(response);
     }
 
@@ -45,14 +47,16 @@ public class StatisticController {
             @Parameter(description = "User role from authentication", hidden = true)
             @RequestHeader("X-Auth-Role") String userRole,
             @Parameter(description = "Week start date", required = true, example = "2023-05-29")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate,
+            @Parameter(description = "Store ID for filtering (optional)", required = false, example = "1")
+            @RequestParam(required = false) Long storeId) {
 
         // Validate user has permission to access statistics
         if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
             throw new IllegalArgumentException("Only admins and super admins can access sales statistics");
         }
 
-        WeeklyStatisticDto response = statisticService.weeklyStatistic(weekStartDate);
+        WeeklyStatisticDto response = statisticService.weeklyStatistic(weekStartDate, storeId);
         return ApiResponseDto.readOk(response);
     }
 
@@ -64,14 +68,16 @@ public class StatisticController {
             @Parameter(description = "Year", required = true, example = "2023")
             @RequestParam int year,
             @Parameter(description = "Month (1-12)", required = true, example = "6")
-            @RequestParam int month) {
+            @RequestParam int month,
+            @Parameter(description = "Store ID for filtering (optional)", required = false, example = "1")
+            @RequestParam(required = false) Long storeId) {
 
         // Validate user has permission to access statistics
         if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
             throw new IllegalArgumentException("Only admins and super admins can access sales statistics");
         }
 
-        MonthlyStatisticDto response = statisticService.monthlyStatistic(year, month);
+        MonthlyStatisticDto response = statisticService.monthlyStatistic(year, month, storeId);
         return ApiResponseDto.readOk(response);
     }
 }

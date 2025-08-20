@@ -42,6 +42,9 @@ public class WeeklyStatisticDto {
     @Schema(description = "Daily breakdown of sales statistics")
     private List<DailyBreakdown> dailyBreakdown;
 
+    @Schema(description = "Change rate compared to previous week (%)", example = "8.3")
+    private Double changeRate;
+
     @Getter
     @Builder
     @Schema(description = "Daily breakdown within the week")

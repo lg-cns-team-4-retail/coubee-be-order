@@ -36,8 +36,8 @@ public class MonthlyStatisticDto {
     @Schema(description = "Number of unique customers for the month", example = "600")
     private Integer uniqueCustomerCount;
 
-    @Schema(description = "Growth rate compared to previous month (%)", example = "12.5")
-    private Double growthRate;
+    @Schema(description = "Change rate compared to previous month (%)", example = "12.5")
+    private Double changeRate;
 
     @Schema(description = "Best performing week of the month", example = "2023-06-12 to 2023-06-18")
     private String bestPerformingWeek;

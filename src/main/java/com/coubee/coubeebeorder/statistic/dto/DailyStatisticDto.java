@@ -29,6 +29,9 @@ public class DailyStatisticDto {
     @Schema(description = "Number of unique customers for the day", example = "20")
     private Integer uniqueCustomerCount;
 
+    @Schema(description = "Change rate compared to previous day (%)", example = "12.5")
+    private Double changeRate;
+
     @Schema(description = "Peak hour of the day (24-hour format)", example = "14")
     private Integer peakHour;
 
