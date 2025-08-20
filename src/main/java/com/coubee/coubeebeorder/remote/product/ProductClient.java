@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
  */
 @FeignClient(
     name = "coubee-be-product-service",
+    url = "http://coubee-be-product-service:8080",
     configuration = com.coubee.coubeebeorder.config.FeignConfig.class
 )
 public interface ProductClient {
