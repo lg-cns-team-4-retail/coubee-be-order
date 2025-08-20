@@ -202,6 +202,10 @@ public class StatisticRepositoryImpl implements StatisticRepository {
             // Calculate change rate (this is now handled in the service layer)
             double changeRate = 0.0; // Will be set by service layer
 
+            // Get top products and weekly breakdown
+            List<MonthlyStatisticDto.TopProduct> topProducts = getTopProducts(year, month, storeId);
+            List<MonthlyStatisticDto.WeeklyBreakdown> weeklyBreakdown = getWeeklyBreakdown(year, month, storeId);
+
             // Get best performing week from weekly breakdown
             String bestPerformingWeek = "Week 1"; // Default value
             long bestWeekSalesAmount = 0L; // Default value
@@ -219,10 +223,6 @@ public class StatisticRepositoryImpl implements StatisticRepository {
                     bestWeekSalesAmount = bestWeek.getSalesAmount();
                 }
             }
-
-            // Get top products and weekly breakdown
-            List<MonthlyStatisticDto.TopProduct> topProducts = getTopProducts(year, month, storeId);
-            List<MonthlyStatisticDto.WeeklyBreakdown> weeklyBreakdown = getWeeklyBreakdown(year, month, storeId);
 
             return MonthlyStatisticDto.builder()
                     .month(String.format("%04d-%02d", year, month))
