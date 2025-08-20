@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -64,21 +67,41 @@ public class StatisticRepositoryImpl implements StatisticRepository {
 
         String sql = sqlBuilder.toString();
 
-        // Prepare parameters based on whether storeId is provided
+        // Debug logging
+        log.debug("Executing SQL: {}", sql);
+        log.debug("Parameters - status: {}, startUnix: {}, endUnix: {}, storeId: {}",
+                 OrderStatus.RECEIVED.name(), startUnix, endUnix, storeId);
+
+        // Prepare parameters with explicit type handling
         Object[] params;
         if (storeId != null) {
-            params = new Object[]{OrderStatus.RECEIVED.name(), startUnix, endUnix, storeId};
+            // Ensure storeId is properly cast to Long for PostgreSQL bigint
+            params = new Object[]{
+                OrderStatus.RECEIVED.name(),  // String for varchar
+                startUnix,                    // long for bigint
+                endUnix,                      // long for bigint
+                storeId.longValue()           // Explicit Long for bigint
+            };
         } else {
-            params = new Object[]{OrderStatus.RECEIVED.name(), startUnix, endUnix};
+            params = new Object[]{
+                OrderStatus.RECEIVED.name(),  // String for varchar
+                startUnix,                    // long for bigint
+                endUnix                       // long for bigint
+            };
         }
 
-        return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
-            long totalSalesAmount = rs.getLong("total_sales_amount");
-            int totalOrderCount = rs.getInt("total_order_count");
-            int uniqueCustomerCount = rs.getInt("unique_customer_count");
+        try {
+            return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+                long totalSalesAmount = rs.getLong("total_sales_amount");
+                int totalOrderCount = rs.getInt("total_order_count");
+                int uniqueCustomerCount = rs.getInt("unique_customer_count");
 
-            return new OrderAggregationResult(totalSalesAmount, totalOrderCount, uniqueCustomerCount);
-        }, params);
+                return new OrderAggregationResult(totalSalesAmount, totalOrderCount, uniqueCustomerCount);
+            }, params);
+        } catch (Exception e) {
+            log.error("Error executing getOrderAggregation query. SQL: {}, Params: {}", sql, java.util.Arrays.toString(params), e);
+            throw e;
+        }
     }
 
     @Override
@@ -109,16 +132,37 @@ public class StatisticRepositoryImpl implements StatisticRepository {
 
         String sql = sqlBuilder.toString();
 
-        // Prepare parameters based on whether storeId is provided
+        // Debug logging
+        log.debug("Executing SQL: {}", sql);
+        log.debug("Parameters - status: {}, startUnix: {}, endUnix: {}, storeId: {}",
+                 OrderStatus.RECEIVED.name(), startUnix, endUnix, storeId);
+
+        // Prepare parameters with explicit type handling
         Object[] params;
         if (storeId != null) {
-            params = new Object[]{OrderStatus.RECEIVED.name(), startUnix, endUnix, storeId};
+            // Ensure storeId is properly cast to Long for PostgreSQL bigint
+            params = new Object[]{
+                OrderStatus.RECEIVED.name(),  // String for varchar
+                startUnix,                    // long for bigint
+                endUnix,                      // long for bigint
+                storeId.longValue()           // Explicit Long for bigint
+            };
         } else {
-            params = new Object[]{OrderStatus.RECEIVED.name(), startUnix, endUnix};
+            params = new Object[]{
+                OrderStatus.RECEIVED.name(),  // String for varchar
+                startUnix,                    // long for bigint
+                endUnix                       // long for bigint
+            };
         }
 
-        Integer result = jdbcTemplate.queryForObject(sql, Integer.class, params);
-        return result != null ? result : 0;
+        try {
+            Integer result = jdbcTemplate.queryForObject(sql, Integer.class, params);
+            log.debug("Query result: {}", result);
+            return result != null ? result : 0;
+        } catch (Exception e) {
+            log.error("Error executing getTotalItemCount query. SQL: {}, Params: {}", sql, java.util.Arrays.toString(params), e);
+            throw e;
+        }
     }
 
     @Override
