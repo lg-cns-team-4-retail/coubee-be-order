@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * 원본 요청에서 전달받아 포워딩해야 합니다.
  */
 @FeignClient(
-    name = "coubee-be-product",
+    name = "coubee-be-product-service",
     configuration = com.coubee.coubeebeorder.config.FeignConfig.class
 )
 public interface ProductClient {
