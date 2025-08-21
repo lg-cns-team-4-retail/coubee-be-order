@@ -29,7 +29,7 @@ spec:
             #    이것이 애플리케이션이 외부 ConfigMap 설정을 제대로 읽게 만듭니다.
             # ======================================================================
             - name: SPRING_CONFIG_LOCATION
-              value: file:/etc/config/application-stg.yml
+              value: file:/etc/config/application-stg.yml,file:/etc/secret/application-secret.yml
             # ======================================================================
 
             - name: SPRING_CLOUD_KUBERNETES_ENABLED
