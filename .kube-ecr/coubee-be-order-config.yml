@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: be-order-config
+data:
+  application-stg.yml: |
+    server:
+      port: 8080
+    
+    spring:
+      datasource:
+        url: jdbc:postgresql://52.78.117.85:5432/coubee_order?currentSchema=coubee_order
+        driver-class-name: org.postgresql.Driver
+        hikari:
+          connection-test-query: SELECT 1
+          validation-timeout: 5000
+      jpa:
+        database-platform: org.hibernate.dialect.PostgreSQLDialect
+        hibernate:
+          ddl-auto: validate
+        show-sql: true
+        open-in-view: false
+        properties:
+          hibernate.default_schema: coubee_order
+      kafka:
+        bootstrap-servers: coubee-external-kafka-service:9092
+    portone:
+      api:
+        url: https://api.portone.io
+        version: v2
