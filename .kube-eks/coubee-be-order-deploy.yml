@@ -14,11 +14,24 @@ spec:
     spec:
       containers:
         - name: coubee-be-order
-          image: 310095858382.dkr.ecr.ap-northeast-2.amazonaws.com/coubee-be-order:0.0.1
+          # ======================================================================
+          # 1. 최신 코드와 수정사항이 반영된 0.0.3 버전으로 변경합니다.
+          # ======================================================================
+          image: 310095858382.dkr.ecr.ap-northeast-2.amazonaws.com/coubee-be-order:0.0.3
+          # ======================================================================
           imagePullPolicy: Always
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: stg
+            
+            # ======================================================================
+            # 2. H2 데이터베이스 에러를 해결하기 위해 이 환경변수를 추가합니다.
+            #    이것이 애플리케이션이 외부 ConfigMap 설정을 제대로 읽게 만듭니다.
+            # ======================================================================
+            - name: SPRING_CONFIG_LOCATION
+              value: file:/etc/config/application-stg.yml
+            # ======================================================================
+
             - name: SPRING_CLOUD_KUBERNETES_ENABLED
               value: "false"
             - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED
