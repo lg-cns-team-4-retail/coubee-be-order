@@ -9,7 +9,8 @@ data:
     
     spring:
       # # 1. Flyway 에러 해결: 현재 DB 상태가 V4임을 명시
-      # flyway:
+      flyway:
+        repair-on-migrate: true
       #   baseline-on-migrate: true
       #   baseline-version: 4
       
