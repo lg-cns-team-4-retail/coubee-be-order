@@ -108,7 +108,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @param startUnix start timestamp (UNIX)
      * @param endUnix end timestamp (UNIX)
      * @param storeId store ID filter (optional)
-     * @return peak hour projection
+     * @return optional peak hour projection (empty if no data found)
      */
     @Query(value = """
         SELECT
@@ -122,9 +122,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         ORDER BY hourlySales DESC
         LIMIT 1
         """, nativeQuery = true)
-    PeakHourProjection getPeakHour(@Param("startUnix") Long startUnix,
-                                  @Param("endUnix") Long endUnix,
-                                  @Param("storeId") Long storeId);
+    Optional<PeakHourProjection> getPeakHour(@Param("startUnix") Long startUnix,
+                                            @Param("endUnix") Long endUnix,
+                                            @Param("storeId") Long storeId);
 
     /**
      * Get best performing day for a week
@@ -133,7 +133,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @param startUnix start timestamp (UNIX)
      * @param endUnix end timestamp (UNIX)
      * @param storeId store ID filter (optional)
-     * @return best day projection
+     * @return optional best day projection (empty if no data found)
      */
     @Query(value = """
         SELECT
@@ -147,9 +147,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         ORDER BY dailySales DESC
         LIMIT 1
         """, nativeQuery = true)
-    BestDayProjection getBestPerformingDay(@Param("startUnix") Long startUnix,
-                                          @Param("endUnix") Long endUnix,
-                                          @Param("storeId") Long storeId);
+    Optional<BestDayProjection> getBestPerformingDay(@Param("startUnix") Long startUnix,
+                                                    @Param("endUnix") Long endUnix,
+                                                    @Param("storeId") Long storeId);
 
     /**
      * Get daily breakdown for a week

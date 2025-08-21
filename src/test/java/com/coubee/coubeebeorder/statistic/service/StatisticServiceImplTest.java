@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,7 +54,7 @@ class StatisticServiceImplTest {
 
         given(orderRepository.getOrderAggregation(anyLong(), anyLong(), any())).willReturn(todayOrderStats, yesterdayOrderStats);
         given(orderRepository.getTotalItemCount(anyLong(), anyLong(), any())).willReturn(todayItemCount);
-        given(orderRepository.getPeakHour(anyLong(), anyLong(), any())).willReturn(peakHour);
+        given(orderRepository.getPeakHour(anyLong(), anyLong(), any())).willReturn(Optional.of(peakHour));
 
         // When
         DailyStatisticDto result = statisticService.dailyStatistic(testDate, null);

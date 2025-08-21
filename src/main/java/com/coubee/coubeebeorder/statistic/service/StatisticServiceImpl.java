@@ -46,9 +46,9 @@ public class StatisticServiceImpl implements StatisticService {
                 orderRepository.getTotalItemCount(todayStartUnix, todayEndUnix, storeId);
             int todayItemCount = todayItemCountProjection.getTotalItemCount();
 
-            // Get peak hour information
-            PeakHourProjection peakHour =
-                orderRepository.getPeakHour(todayStartUnix, todayEndUnix, storeId);
+            // Get peak hour information with null-safe handling
+            PeakHourProjection peakHour = orderRepository.getPeakHour(todayStartUnix, todayEndUnix, storeId)
+                .orElse(createDefaultPeakHourProjection());
 
             // Calculate average order amount
             long averageOrderAmount = todayOrderStats.getTotalOrderCount() > 0
@@ -78,8 +78,8 @@ public class StatisticServiceImpl implements StatisticService {
                     .totalItemCount(todayItemCount)
                     .averageOrderAmount(averageOrderAmount)
                     .uniqueCustomerCount(todayOrderStats.getUniqueCustomerCount())
-                    .peakHour(peakHour != null ? peakHour.getHour() : null)
-                    .peakHourSalesAmount(peakHour != null ? peakHour.getHourlySales() : 0L)
+                    .peakHour(peakHour.getHour())
+                    .peakHourSalesAmount(peakHour.getHourlySales())
                     .changeRate(changeRate)
                     .build();
 
@@ -112,9 +112,9 @@ public class StatisticServiceImpl implements StatisticService {
                 orderRepository.getTotalItemCount(currentWeekStartUnix, currentWeekEndUnix, storeId);
             int currentWeekItemCount = currentWeekItemCountProjection.getTotalItemCount();
 
-            // Get best performing day
-            BestDayProjection bestDay =
-                orderRepository.getBestPerformingDay(currentWeekStartUnix, currentWeekEndUnix, storeId);
+            // Get best performing day with null-safe handling
+            BestDayProjection bestDay = orderRepository.getBestPerformingDay(currentWeekStartUnix, currentWeekEndUnix, storeId)
+                .orElse(createDefaultBestDayProjection());
 
             // Get daily breakdown
             List<DailyBreakdownProjection> dailyBreakdownProjections =
@@ -158,8 +158,8 @@ public class StatisticServiceImpl implements StatisticService {
                     .totalItemCount(currentWeekItemCount)
                     .averageDailySalesAmount(averageDailySalesAmount)
                     .uniqueCustomerCount(currentWeekOrderStats.getUniqueCustomerCount())
-                    .bestPerformingDay(bestDay != null ? bestDay.getDayName().trim() : "No data")
-                    .bestDaySalesAmount(bestDay != null ? bestDay.getDailySales() : 0L)
+                    .bestPerformingDay(bestDay.getDayName().trim())
+                    .bestDaySalesAmount(bestDay.getDailySales())
                     .dailyBreakdown(dailyBreakdown)
                     .changeRate(changeRate)
                     .build();
@@ -311,5 +311,41 @@ public class StatisticServiceImpl implements StatisticService {
 
         // Calculate percentage change: ((current - previous) / previous) * 100
         return ((double) (current - previous) / previous) * 100.0;
+    }
+
+    /**
+     * Create a default PeakHourProjection for null-safe handling
+     * @return default projection with null hour and 0 sales
+     */
+    private PeakHourProjection createDefaultPeakHourProjection() {
+        return new PeakHourProjection() {
+            @Override
+            public Integer getHour() {
+                return null; // No peak hour data available
+            }
+
+            @Override
+            public Long getHourlySales() {
+                return 0L; // No sales data available
+            }
+        };
+    }
+
+    /**
+     * Create a default BestDayProjection for null-safe handling
+     * @return default projection with "No data" day name and 0 sales
+     */
+    private BestDayProjection createDefaultBestDayProjection() {
+        return new BestDayProjection() {
+            @Override
+            public String getDayName() {
+                return "No data"; // No best day data available
+            }
+
+            @Override
+            public Long getDailySales() {
+                return 0L; // No sales data available
+            }
+        };
     }
 }
