@@ -1,9 +1,10 @@
 package com.coubee.coubeebeorder.statistic.service;
 
+import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.statistic.dto.DailyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.WeeklyStatisticDto;
-import com.coubee.coubeebeorder.statistic.repository.StatisticRepository;
+import com.coubee.coubeebeorder.statistic.projection.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,17 +15,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("통계 서비스 구현체 테스트")
+@DisplayName("통계 서비스 구현체 테스트 - JPA 리팩토링")
 class StatisticServiceImplTest {
 
     @Mock
-    private StatisticRepository statisticRepository;
+    private OrderRepository orderRepository;
 
     @InjectMocks
     private StatisticServiceImpl statisticService;
@@ -42,11 +46,14 @@ class StatisticServiceImplTest {
     @DisplayName("일일 통계 조회 - 변화율 계산 (증가)")
     void dailyStatistic_ChangeRate_Increase() {
         // Given
-        DailyStatisticDto todayStats = createDailyStatisticDto(testDate, 150000L);
-        DailyStatisticDto yesterdayStats = createDailyStatisticDto(testDate.minusDays(1), 100000L);
+        OrderAggregationProjection todayOrderStats = createOrderAggregationProjection(150000L, 10, 5);
+        OrderAggregationProjection yesterdayOrderStats = createOrderAggregationProjection(100000L, 8, 4);
+        TotalItemCountProjection todayItemCount = createTotalItemCountProjection(25);
+        PeakHourProjection peakHour = createPeakHourProjection(14, 50000L);
 
-        given(statisticRepository.getDailyStatistic(testDate, null)).willReturn(todayStats);
-        given(statisticRepository.getDailyStatistic(testDate.minusDays(1), null)).willReturn(yesterdayStats);
+        given(orderRepository.getOrderAggregation(anyLong(), anyLong(), any())).willReturn(todayOrderStats, yesterdayOrderStats);
+        given(orderRepository.getTotalItemCount(anyLong(), anyLong(), any())).willReturn(todayItemCount);
+        given(orderRepository.getPeakHour(anyLong(), anyLong(), any())).willReturn(peakHour);
 
         // When
         DailyStatisticDto result = statisticService.dailyStatistic(testDate, null);
@@ -54,10 +61,12 @@ class StatisticServiceImplTest {
         // Then
         assertThat(result).isNotNull();
         assertThat(result.getTotalSalesAmount()).isEqualTo(150000L);
+        assertThat(result.getTotalOrderCount()).isEqualTo(10);
+        assertThat(result.getTotalItemCount()).isEqualTo(25);
+        assertThat(result.getUniqueCustomerCount()).isEqualTo(5);
+        assertThat(result.getPeakHour()).isEqualTo(14);
+        assertThat(result.getPeakHourSalesAmount()).isEqualTo(50000L);
         assertThat(result.getChangeRate()).isEqualTo(50.0); // (150000 - 100000) / 100000 * 100 = 50%
-
-        verify(statisticRepository).getDailyStatistic(testDate, null);
-        verify(statisticRepository).getDailyStatistic(testDate.minusDays(1), null);
     }
 
     @Test
@@ -434,5 +443,142 @@ class StatisticServiceImplTest {
                 .topProducts(topProducts)
                 .weeklyBreakdown(weeklyBreakdown)
                 .build();
+    }
+
+    // ========================================
+    // Helper Methods for JPA Projections
+    // ========================================
+
+    private OrderAggregationProjection createOrderAggregationProjection(Long totalSalesAmount, Integer totalOrderCount, Integer uniqueCustomerCount) {
+        return new OrderAggregationProjection() {
+            @Override
+            public Long getTotalSalesAmount() {
+                return totalSalesAmount;
+            }
+
+            @Override
+            public Integer getTotalOrderCount() {
+                return totalOrderCount;
+            }
+
+            @Override
+            public Integer getUniqueCustomerCount() {
+                return uniqueCustomerCount;
+            }
+        };
+    }
+
+    private TotalItemCountProjection createTotalItemCountProjection(Integer totalItemCount) {
+        return new TotalItemCountProjection() {
+            @Override
+            public Integer getTotalItemCount() {
+                return totalItemCount;
+            }
+        };
+    }
+
+    private PeakHourProjection createPeakHourProjection(Integer hour, Long hourlySales) {
+        return new PeakHourProjection() {
+            @Override
+            public Integer getHour() {
+                return hour;
+            }
+
+            @Override
+            public Long getHourlySales() {
+                return hourlySales;
+            }
+        };
+    }
+
+    private BestDayProjection createBestDayProjection(String dayName, Long dailySales) {
+        return new BestDayProjection() {
+            @Override
+            public String getDayName() {
+                return dayName;
+            }
+
+            @Override
+            public Long getDailySales() {
+                return dailySales;
+            }
+        };
+    }
+
+    private DailyBreakdownProjection createDailyBreakdownProjection(String dayOfWeek, LocalDate orderDate, Long salesAmount, Integer orderCount) {
+        return new DailyBreakdownProjection() {
+            @Override
+            public String getDayOfWeek() {
+                return dayOfWeek;
+            }
+
+            @Override
+            public LocalDate getOrderDate() {
+                return orderDate;
+            }
+
+            @Override
+            public Long getSalesAmount() {
+                return salesAmount;
+            }
+
+            @Override
+            public Integer getOrderCount() {
+                return orderCount;
+            }
+        };
+    }
+
+    private TopProductProjection createTopProductProjection(Long productId, String productName, Integer quantitySold, Long salesAmount) {
+        return new TopProductProjection() {
+            @Override
+            public Long getProductId() {
+                return productId;
+            }
+
+            @Override
+            public String getProductName() {
+                return productName;
+            }
+
+            @Override
+            public Integer getQuantitySold() {
+                return quantitySold;
+            }
+
+            @Override
+            public Long getSalesAmount() {
+                return salesAmount;
+            }
+        };
+    }
+
+    private WeeklyBreakdownProjection createWeeklyBreakdownProjection(Integer weekNumber, LocalDate weekStartDate, LocalDate weekEndDate, Long salesAmount, Integer orderCount) {
+        return new WeeklyBreakdownProjection() {
+            @Override
+            public Integer getWeekNumber() {
+                return weekNumber;
+            }
+
+            @Override
+            public LocalDate getWeekStartDate() {
+                return weekStartDate;
+            }
+
+            @Override
+            public LocalDate getWeekEndDate() {
+                return weekEndDate;
+            }
+
+            @Override
+            public Long getSalesAmount() {
+                return salesAmount;
+            }
+
+            @Override
+            public Integer getOrderCount() {
+                return orderCount;
+            }
+        };
     }
 }

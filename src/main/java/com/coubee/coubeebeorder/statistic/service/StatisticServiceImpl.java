@@ -1,19 +1,24 @@
 package com.coubee.coubeebeorder.statistic.service;
 
+import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.statistic.dto.DailyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.WeeklyStatisticDto;
-import com.coubee.coubeebeorder.statistic.repository.StatisticRepository;
+import com.coubee.coubeebeorder.statistic.projection.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Service implementation for sales statistics business logic
+ * Refactored to use JPA OrderRepository instead of JdbcTemplate StatisticRepository
  */
 @Slf4j
 @Service
@@ -21,32 +26,43 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class StatisticServiceImpl implements StatisticService {
 
-    private final StatisticRepository statisticRepository;
+    private final OrderRepository orderRepository;
 
     @Override
     public DailyStatisticDto dailyStatistic(LocalDate date, Long storeId) {
         log.info("Getting daily statistics for date: {}, storeId: {}", date, storeId);
 
         try {
+            // Convert LocalDate to UNIX timestamps for today
+            long todayStartUnix = date.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
+            long todayEndUnix = date.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
+
             // Get current day's order aggregation data
-            StatisticRepository.OrderAggregationResult todayOrderStats =
-                statisticRepository.getOrderAggregation(date, date, storeId);
+            OrderAggregationProjection todayOrderStats =
+                orderRepository.getOrderAggregation(todayStartUnix, todayEndUnix, storeId);
 
             // Get current day's item count
-            int todayItemCount = statisticRepository.getTotalItemCount(date, date, storeId);
+            TotalItemCountProjection todayItemCountProjection =
+                orderRepository.getTotalItemCount(todayStartUnix, todayEndUnix, storeId);
+            int todayItemCount = todayItemCountProjection.getTotalItemCount();
 
             // Get peak hour information
-            StatisticRepository.PeakHourResult peakHour =
-                statisticRepository.getPeakHour(date, storeId);
+            PeakHourProjection peakHour =
+                orderRepository.getPeakHour(todayStartUnix, todayEndUnix, storeId);
 
             // Calculate average order amount
             long averageOrderAmount = todayOrderStats.getTotalOrderCount() > 0
                 ? todayOrderStats.getTotalSalesAmount() / todayOrderStats.getTotalOrderCount()
                 : 0;
 
+            // Convert LocalDate to UNIX timestamps for yesterday
+            LocalDate yesterday = date.minusDays(1);
+            long yesterdayStartUnix = yesterday.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
+            long yesterdayEndUnix = yesterday.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
+
             // Get previous day's statistics for change rate calculation
-            StatisticRepository.OrderAggregationResult yesterdayOrderStats =
-                statisticRepository.getOrderAggregation(date.minusDays(1), date.minusDays(1), storeId);
+            OrderAggregationProjection yesterdayOrderStats =
+                orderRepository.getOrderAggregation(yesterdayStartUnix, yesterdayEndUnix, storeId);
 
             // Calculate change rate
             double changeRate = calculatePercentageChange(
@@ -62,8 +78,8 @@ public class StatisticServiceImpl implements StatisticService {
                     .totalItemCount(todayItemCount)
                     .averageOrderAmount(averageOrderAmount)
                     .uniqueCustomerCount(todayOrderStats.getUniqueCustomerCount())
-                    .peakHour(peakHour.getHour())
-                    .peakHourSalesAmount(peakHour.getSalesAmount())
+                    .peakHour(peakHour != null ? peakHour.getHour() : null)
+                    .peakHourSalesAmount(peakHour != null ? peakHour.getHourlySales() : 0L)
                     .changeRate(changeRate)
                     .build();
 
@@ -83,29 +99,49 @@ public class StatisticServiceImpl implements StatisticService {
         try {
             LocalDate weekEndDate = weekStartDate.plusDays(6);
 
+            // Convert LocalDate to UNIX timestamps for current week
+            long currentWeekStartUnix = weekStartDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
+            long currentWeekEndUnix = weekEndDate.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
+
             // Get current week's order aggregation data
-            StatisticRepository.OrderAggregationResult currentWeekOrderStats =
-                statisticRepository.getOrderAggregation(weekStartDate, weekEndDate, storeId);
+            OrderAggregationProjection currentWeekOrderStats =
+                orderRepository.getOrderAggregation(currentWeekStartUnix, currentWeekEndUnix, storeId);
 
             // Get current week's item count
-            int currentWeekItemCount = statisticRepository.getTotalItemCount(weekStartDate, weekEndDate, storeId);
+            TotalItemCountProjection currentWeekItemCountProjection =
+                orderRepository.getTotalItemCount(currentWeekStartUnix, currentWeekEndUnix, storeId);
+            int currentWeekItemCount = currentWeekItemCountProjection.getTotalItemCount();
 
             // Get best performing day
-            StatisticRepository.BestDayResult bestDay =
-                statisticRepository.getBestPerformingDay(weekStartDate, weekEndDate, storeId);
+            BestDayProjection bestDay =
+                orderRepository.getBestPerformingDay(currentWeekStartUnix, currentWeekEndUnix, storeId);
 
             // Get daily breakdown
-            List<WeeklyStatisticDto.DailyBreakdown> dailyBreakdown =
-                statisticRepository.getDailyBreakdown(weekStartDate, weekEndDate, storeId);
+            List<DailyBreakdownProjection> dailyBreakdownProjections =
+                orderRepository.getDailyBreakdown(currentWeekStartUnix, currentWeekEndUnix, storeId);
+
+            // Convert projections to DTOs
+            List<WeeklyStatisticDto.DailyBreakdown> dailyBreakdown = dailyBreakdownProjections.stream()
+                .map(projection -> WeeklyStatisticDto.DailyBreakdown.builder()
+                    .dayOfWeek(projection.getDayOfWeek().trim()) // Trim whitespace from PostgreSQL TO_CHAR
+                    .date(projection.getOrderDate())
+                    .salesAmount(projection.getSalesAmount())
+                    .orderCount(projection.getOrderCount())
+                    .build())
+                .collect(Collectors.toList());
 
             // Calculate average daily sales
             long averageDailySalesAmount = currentWeekOrderStats.getTotalSalesAmount() / 7;
 
-            // Get previous week's statistics for change rate calculation
+            // Convert LocalDate to UNIX timestamps for previous week
             LocalDate previousWeekStartDate = weekStartDate.minusWeeks(1);
             LocalDate previousWeekEndDate = previousWeekStartDate.plusDays(6);
-            StatisticRepository.OrderAggregationResult previousWeekOrderStats =
-                statisticRepository.getOrderAggregation(previousWeekStartDate, previousWeekEndDate, storeId);
+            long previousWeekStartUnix = previousWeekStartDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
+            long previousWeekEndUnix = previousWeekEndDate.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
+
+            // Get previous week's statistics for change rate calculation
+            OrderAggregationProjection previousWeekOrderStats =
+                orderRepository.getOrderAggregation(previousWeekStartUnix, previousWeekEndUnix, storeId);
 
             // Calculate change rate
             double changeRate = calculatePercentageChange(
@@ -122,8 +158,8 @@ public class StatisticServiceImpl implements StatisticService {
                     .totalItemCount(currentWeekItemCount)
                     .averageDailySalesAmount(averageDailySalesAmount)
                     .uniqueCustomerCount(currentWeekOrderStats.getUniqueCustomerCount())
-                    .bestPerformingDay(bestDay.getDayOfWeek())
-                    .bestDaySalesAmount(bestDay.getSalesAmount())
+                    .bestPerformingDay(bestDay != null ? bestDay.getDayName().trim() : "No data")
+                    .bestDaySalesAmount(bestDay != null ? bestDay.getDailySales() : 0L)
                     .dailyBreakdown(dailyBreakdown)
                     .changeRate(changeRate)
                     .build();
@@ -146,20 +182,47 @@ public class StatisticServiceImpl implements StatisticService {
             LocalDate monthStartDate = LocalDate.of(year, month, 1);
             LocalDate monthEndDate = monthStartDate.withDayOfMonth(monthStartDate.lengthOfMonth());
 
+            // Convert LocalDate to UNIX timestamps for current month
+            long currentMonthStartUnix = monthStartDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
+            long currentMonthEndUnix = monthEndDate.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
+
             // Get current month's order aggregation data
-            StatisticRepository.OrderAggregationResult currentMonthOrderStats =
-                statisticRepository.getOrderAggregation(monthStartDate, monthEndDate, storeId);
+            OrderAggregationProjection currentMonthOrderStats =
+                orderRepository.getOrderAggregation(currentMonthStartUnix, currentMonthEndUnix, storeId);
 
             // Get current month's item count
-            int currentMonthItemCount = statisticRepository.getTotalItemCount(monthStartDate, monthEndDate, storeId);
+            TotalItemCountProjection currentMonthItemCountProjection =
+                orderRepository.getTotalItemCount(currentMonthStartUnix, currentMonthEndUnix, storeId);
+            int currentMonthItemCount = currentMonthItemCountProjection.getTotalItemCount();
 
             // Get top products
-            List<MonthlyStatisticDto.TopProduct> topProducts =
-                statisticRepository.getTopProducts(year, month, storeId);
+            List<TopProductProjection> topProductProjections =
+                orderRepository.getTopProducts(currentMonthStartUnix, currentMonthEndUnix, storeId);
+
+            // Convert projections to DTOs
+            List<MonthlyStatisticDto.TopProduct> topProducts = topProductProjections.stream()
+                .map(projection -> MonthlyStatisticDto.TopProduct.builder()
+                    .productId(projection.getProductId())
+                    .productName(projection.getProductName())
+                    .quantitySold(projection.getQuantitySold())
+                    .salesAmount(projection.getSalesAmount())
+                    .build())
+                .collect(Collectors.toList());
 
             // Get weekly breakdown
-            List<MonthlyStatisticDto.WeeklyBreakdown> weeklyBreakdown =
-                statisticRepository.getWeeklyBreakdown(year, month, storeId);
+            List<WeeklyBreakdownProjection> weeklyBreakdownProjections =
+                orderRepository.getWeeklyBreakdown(currentMonthStartUnix, currentMonthEndUnix, storeId);
+
+            // Convert projections to DTOs
+            List<MonthlyStatisticDto.WeeklyBreakdown> weeklyBreakdown = weeklyBreakdownProjections.stream()
+                .map(projection -> MonthlyStatisticDto.WeeklyBreakdown.builder()
+                    .weekNumber(projection.getWeekNumber())
+                    .weekStartDate(projection.getWeekStartDate())
+                    .weekEndDate(projection.getWeekEndDate())
+                    .salesAmount(projection.getSalesAmount())
+                    .orderCount(projection.getOrderCount())
+                    .build())
+                .collect(Collectors.toList());
 
             // Calculate average daily sales
             long averageDailySalesAmount = currentMonthOrderStats.getTotalSalesAmount() / monthStartDate.lengthOfMonth();
@@ -177,12 +240,16 @@ public class StatisticServiceImpl implements StatisticService {
                 }
             }
 
-            // Get previous month's statistics for change rate calculation
+            // Convert LocalDate to UNIX timestamps for previous month
             LocalDate previousMonth = monthStartDate.minusMonths(1);
             LocalDate previousMonthStartDate = previousMonth.withDayOfMonth(1);
             LocalDate previousMonthEndDate = previousMonth.withDayOfMonth(previousMonth.lengthOfMonth());
-            StatisticRepository.OrderAggregationResult previousMonthOrderStats =
-                statisticRepository.getOrderAggregation(previousMonthStartDate, previousMonthEndDate, storeId);
+            long previousMonthStartUnix = previousMonthStartDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
+            long previousMonthEndUnix = previousMonthEndDate.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
+
+            // Get previous month's statistics for change rate calculation
+            OrderAggregationProjection previousMonthOrderStats =
+                orderRepository.getOrderAggregation(previousMonthStartUnix, previousMonthEndUnix, storeId);
 
             // Calculate change rate
             double changeRate = calculatePercentageChange(
