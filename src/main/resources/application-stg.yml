@@ -1,5 +1,13 @@
-spring:
-  config:
-    import:
-      - file:/etc/config/application-stg.yml
-      - file:/etc/secret/application-secret.yml
+# 이 파일은 프로덕션 환경에서 사용되지 않습니다.
+# 모든 'stg' 프로파일 설정은 쿠버네티스 ConfigMap ('be-order-config')을 통해 외부에서 주입됩니다.
+#
+# 'spring.config.import' 구문은 제거되었습니다.
+# 이는 애플리케이션 시작 시 JAR 내부의 설정과 외부 ConfigMap 설정 간의 혼선을 방지하고,
+# 오직 외부 설정 파일만을 유일한 설정 소스로 사용하도록 강제하기 위함입니다.
+#
+# This file is not used in production environments.
+# All 'stg' profile configurations are injected externally via the Kubernetes ConfigMap ('be-order-config').
+#
+# The 'spring.config.import' directive has been removed to prevent confusion
+# between internal JAR configurations and the external ConfigMap during application startup,
+# ensuring that the external configuration file is the sole source of truth.
