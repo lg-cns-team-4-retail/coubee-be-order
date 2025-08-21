@@ -45,4 +45,15 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
 );
 CREATE INDEX idx_payment_id ON payments (payment_id);
- 
+
+-- 결제 상품 테이블 (추가)
+CREATE TABLE IF NOT EXISTS payment_items (
+    id BIGSERIAL PRIMARY KEY,
+    payment_id VARCHAR(50) NOT NULL,
+    item_id BIGINT NOT NULL,
+    quantity INT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (payment_id) REFERENCES payments (payment_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_payment_items_payment_id ON payment_items (payment_id);
