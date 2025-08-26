@@ -7,6 +7,7 @@ import com.coubee.coubeebeorder.common.exception.NotFound;
 import com.coubee.coubeebeorder.domain.*;
 import com.coubee.coubeebeorder.domain.dto.*;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
+import com.coubee.coubeebeorder.domain.repository.OrderTimestampRepository;
 import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
 import com.coubee.coubeebeorder.kafka.producer.product.event.StockIncreaseEvent;
 import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
@@ -17,6 +18,7 @@ import io.portone.sdk.server.payment.PaymentClient;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderTimestampRepository orderTimestampRepository;
     private final KafkaMessageProducer kafkaMessageProducer;
     // ✅✅✅ FeignClient 대신 공식 SDK 클라이언트를 주입받습니다. ✅✅✅
     private final PaymentClient portonePaymentClient;
@@ -107,6 +110,10 @@ public class OrderServiceImpl implements OrderService {
             order.addOrderItem(orderItem);
         }
 
+        // Record initial status history (PENDING)
+        OrderTimestamp initialTimestamp = OrderTimestamp.createTimestamp(order, OrderStatus.PENDING);
+        order.addStatusHistory(initialTimestamp);
+
         orderRepository.save(order);
 
         log.info("Order created successfully: orderId={}, totalAmount={}", orderId, totalAmount);
@@ -155,11 +162,12 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        order.updateStatus(OrderStatus.CANCELLED);
+        updateOrderStatusAndCreateHistory(order, OrderStatus.CANCELLED);
 
         // V3: 주문 취소 시 모든 주문 아이템의 이벤트 타입을 REFUND로 설정
         order.getItems().forEach(item -> item.updateEventType(EventType.REFUND));
 
+        orderRepository.save(order);
         publishStockIncreaseEvent(order);
 
         log.info("Order cancelled successfully: {}", orderId);
@@ -190,28 +198,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public OrderListResponse getUserOrders(Long userId, Pageable pageable) {
-        log.info("Getting orders for user: {}", userId);
+    public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable) {
+        log.info("Getting detailed orders for user: {}", userId);
 
-        Page<Order> orderPage = orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        Page<Order> orderPage = orderRepository.findOrdersWithDetailsByUserId(userId, pageable);
 
-        List<OrderListResponse.OrderSummary> orderSummaries = orderPage.getContent().stream()
-                .map(this::convertToOrderSummary)
-                .collect(Collectors.toList());
-
-        OrderListResponse.PageInfo pageInfo = OrderListResponse.PageInfo.builder()
-                .page(orderPage.getNumber())
-                .size(orderPage.getSize())
-                .totalPages(orderPage.getTotalPages())
-                .totalElements((int) orderPage.getTotalElements())
-                .first(orderPage.isFirst())
-                .last(orderPage.isLast())
-                .build();
-
-        return OrderListResponse.builder()
-                .orders(orderSummaries)
-                .pageInfo(pageInfo)
-                .build();
+        return orderPage.map(this::convertToOrderDetailResponse);
     }
 
     @Override
@@ -226,7 +218,7 @@ public class OrderServiceImpl implements OrderService {
             throw new InvalidStatusTransitionException(order.getStatus(), OrderStatus.RECEIVED);
         }
 
-        order.updateStatus(OrderStatus.RECEIVED);
+        updateOrderStatusAndCreateHistory(order, OrderStatus.RECEIVED);
         orderRepository.save(order);
 
         log.info("Order marked as received successfully: {}", orderId);
@@ -245,7 +237,7 @@ public class OrderServiceImpl implements OrderService {
 
         validateStatusTransition(previousStatus, request.getStatus());
 
-        order.updateStatus(request.getStatus());
+        updateOrderStatusAndCreateHistory(order, request.getStatus());
         orderRepository.save(order);
 
         log.info("Order status updated successfully: {} -> {}", previousStatus, request.getStatus());
@@ -260,6 +252,20 @@ public class OrderServiceImpl implements OrderService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public void updateOrderStatusWithHistory(String orderId, OrderStatus newStatus) {
+        log.info("Updating order status with history for: {} to: {}", orderId, newStatus);
+
+        Order order = orderRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다. Order ID: " + orderId));
+
+        updateOrderStatusAndCreateHistory(order, newStatus);
+        orderRepository.save(order);
+
+        log.info("Order status updated with history successfully: {}", orderId);
+    }
+
     private void validateStatusTransition(OrderStatus from, OrderStatus to) {
         boolean isValidTransition = switch (from) {
             case PENDING -> to == OrderStatus.PAID || to == OrderStatus.CANCELLED || to == OrderStatus.FAILED;
@@ -272,6 +278,22 @@ public class OrderServiceImpl implements OrderService {
         if (!isValidTransition) {
             throw new InvalidStatusTransitionException(from, to);
         }
+    }
+
+    /**
+     * Updates order status and creates a history record
+     *
+     * @param order the order to update
+     * @param newStatus the new status
+     */
+    private void updateOrderStatusAndCreateHistory(Order order, OrderStatus newStatus) {
+        order.updateStatus(newStatus);
+
+        // Create and add status history record
+        OrderTimestamp timestamp = OrderTimestamp.createTimestamp(order, newStatus);
+        order.addStatusHistory(timestamp);
+
+        log.debug("Status history recorded for order {}: {}", order.getOrderId(), newStatus);
     }
 
     private void publishStockIncreaseEvent(Order order) {

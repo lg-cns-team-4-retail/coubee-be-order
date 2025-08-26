@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -57,17 +58,17 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get User Orders", description = "Retrieves order list by user ID")
-    @GetMapping("/users/{userId}/orders")
-    public ApiResponseDto<OrderListResponse> getUserOrders(
-            @Parameter(description = "User ID", required = true, example = "1")
-            @PathVariable Long userId,
+    @Operation(summary = "Get My Orders", description = "Retrieves detailed order list for authenticated user")
+    @GetMapping("/users/me/orders")
+    public ApiResponseDto<Page<OrderDetailResponse>> getMyOrders(
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        OrderListResponse response = orderService.getUserOrders(userId, pageRequest);
+        Page<OrderDetailResponse> response = orderService.getUserOrders(userId, pageRequest);
         return ApiResponseDto.readOk(response);
     }
 

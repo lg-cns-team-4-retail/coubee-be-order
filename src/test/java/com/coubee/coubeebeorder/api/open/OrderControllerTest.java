@@ -1,6 +1,7 @@
 package com.coubee.coubeebeorder.api.open;
 
 import com.coubee.coubeebeorder.domain.OrderStatus;
+import com.coubee.coubeebeorder.domain.dto.OrderDetailResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,10 +10,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.mockito.ArgumentMatchers.anyString;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -94,5 +102,44 @@ class OrderControllerTest {
         mockMvc.perform(get("/api/order/orders/status/{orderId}", cancelledOrderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("내 주문 목록 조회 - 성공")
+    void getMyOrders_Success() throws Exception {
+        // Given
+        Long userId = 1L;
+        OrderDetailResponse orderDetail = OrderDetailResponse.builder()
+                .orderId("order_test_123")
+                .userId(userId)
+                .storeId(1L)
+                .status(OrderStatus.PAID)
+                .totalAmount(25000)
+                .recipientName("홍길동")
+                .createdAt(LocalDateTime.now())
+                .items(Collections.emptyList())
+                .build();
+
+        List<OrderDetailResponse> orders = List.of(orderDetail);
+        Page<OrderDetailResponse> orderPage = new PageImpl<>(orders, PageRequest.of(0, 10), 1);
+
+        given(orderService.getUserOrders(eq(userId), any(PageRequest.class))).willReturn(orderPage);
+
+        // When & Then
+        mockMvc.perform(get("/api/order/users/me/orders")
+                        .header("X-Auth-UserId", userId)
+                        .param("page", "0")
+                        .param("size", "10")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.content[0].orderId").value("order_test_123"))
+                .andExpect(jsonPath("$.data.content[0].userId").value(userId))
+                .andExpect(jsonPath("$.data.content[0].status").value("PAID"))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1));
     }
 }

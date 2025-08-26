@@ -6,6 +6,7 @@ spring:
 logging:
   level:
     com.coubee.coubeebeorder.remote.product: DEBUG
+    com.coubee.coubeebeorder.remote.store: DEBUG
     feign: DEBUG
 
 

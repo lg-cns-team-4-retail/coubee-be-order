@@ -5,28 +5,38 @@ import com.coubee.coubeebeorder.domain.EventType;
 import com.coubee.coubeebeorder.domain.Order;
 import com.coubee.coubeebeorder.domain.OrderItem;
 import com.coubee.coubeebeorder.domain.OrderStatus;
+import com.coubee.coubeebeorder.domain.OrderTimestamp;
 import com.coubee.coubeebeorder.domain.dto.OrderDetailResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
+import com.coubee.coubeebeorder.domain.repository.OrderTimestampRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceImplTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private OrderTimestampRepository orderTimestampRepository;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -134,5 +144,117 @@ class OrderServiceImplTest {
 
         OrderStatusResponse receivedResult = orderService.getOrderStatus(receivedOrderId);
         assertThat(receivedResult.getStatus()).isEqualTo(OrderStatus.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("사용자 주문 목록 조회 - 성공")
+    void getUserOrders_Success() {
+        // Given
+        Long userId = 1L;
+        PageRequest pageRequest = PageRequest.of(0, 10);
+
+        Order order1 = Order.createOrder("order_1", userId, 1L, 10000, "User 1");
+        order1.updateStatus(OrderStatus.PAID);
+        OrderItem item1 = OrderItem.createOrderItem(1L, "상품 1", 2, 5000);
+        order1.addOrderItem(item1);
+
+        Order order2 = Order.createOrder("order_2", userId, 1L, 20000, "User 1");
+        order2.updateStatus(OrderStatus.PREPARING);
+        OrderItem item2 = OrderItem.createOrderItem(2L, "상품 2", 1, 20000);
+        order2.addOrderItem(item2);
+
+        List<Order> orders = List.of(order1, order2);
+        Page<Order> orderPage = new PageImpl<>(orders, pageRequest, 2);
+
+        given(orderRepository.findOrdersWithDetailsByUserId(eq(userId), eq(pageRequest)))
+                .willReturn(orderPage);
+
+        // When
+        Page<OrderDetailResponse> result = orderService.getUserOrders(userId, pageRequest);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getTotalPages()).isEqualTo(1);
+
+        OrderDetailResponse firstOrder = result.getContent().get(0);
+        assertThat(firstOrder.getOrderId()).isEqualTo("order_1");
+        assertThat(firstOrder.getUserId()).isEqualTo(userId);
+        assertThat(firstOrder.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(firstOrder.getTotalAmount()).isEqualTo(10000);
+        assertThat(firstOrder.getItems()).hasSize(1);
+        assertThat(firstOrder.getItems().get(0).getProductName()).isEqualTo("상품 1");
+
+        OrderDetailResponse secondOrder = result.getContent().get(1);
+        assertThat(secondOrder.getOrderId()).isEqualTo("order_2");
+        assertThat(secondOrder.getStatus()).isEqualTo(OrderStatus.PREPARING);
+        assertThat(secondOrder.getTotalAmount()).isEqualTo(20000);
+    }
+
+    @Test
+    @DisplayName("주문 상태 업데이트 시 이력 기록 - updateOrderStatusWithHistory")
+    void updateOrderStatusWithHistory_Success() {
+        // Given
+        String orderId = "test_order_123";
+        Order order = Order.createOrder(orderId, 1L, 1L, 10000, "Test User");
+        order.updateStatus(OrderStatus.PENDING);
+
+        given(orderRepository.findByOrderId(orderId)).willReturn(Optional.of(order));
+        given(orderRepository.save(any(Order.class))).willReturn(order);
+
+        // When
+        orderService.updateOrderStatusWithHistory(orderId, OrderStatus.PAID);
+
+        // Then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getStatusHistory()).hasSize(1);
+
+        OrderTimestamp timestamp = order.getStatusHistory().get(0);
+        assertThat(timestamp.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(timestamp.getOrder()).isEqualTo(order);
+        assertThat(timestamp.getUpdatedAt()).isNotNull();
+
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 주문 상태 업데이트 시 예외 발생")
+    void updateOrderStatusWithHistory_OrderNotFound() {
+        // Given
+        String orderId = "non_existent_order";
+        given(orderRepository.findByOrderId(orderId)).willReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> orderService.updateOrderStatusWithHistory(orderId, OrderStatus.PAID))
+                .isInstanceOf(NotFound.class)
+                .hasMessageContaining("주문을 찾을 수 없습니다");
+    }
+
+    @Test
+    @DisplayName("주문 상태 변경 시 이력이 누적되는지 확인")
+    void orderStatusHistory_Accumulation() {
+        // Given
+        String orderId = "test_order_history";
+        Order order = Order.createOrder(orderId, 1L, 1L, 10000, "Test User");
+
+        given(orderRepository.findByOrderId(orderId)).willReturn(Optional.of(order));
+        given(orderRepository.save(any(Order.class))).willReturn(order);
+
+        // When - 여러 번 상태 변경
+        orderService.updateOrderStatusWithHistory(orderId, OrderStatus.PAID);
+        orderService.updateOrderStatusWithHistory(orderId, OrderStatus.PREPARING);
+        orderService.updateOrderStatusWithHistory(orderId, OrderStatus.PREPARED);
+
+        // Then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PREPARED);
+        assertThat(order.getStatusHistory()).hasSize(3);
+
+        assertThat(order.getStatusHistory().get(0).getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getStatusHistory().get(1).getStatus()).isEqualTo(OrderStatus.PREPARING);
+        assertThat(order.getStatusHistory().get(2).getStatus()).isEqualTo(OrderStatus.PREPARED);
+
+        // 모든 이력이 같은 주문을 참조하는지 확인
+        assertThat(order.getStatusHistory()).allMatch(timestamp -> timestamp.getOrder().equals(order));
     }
 }

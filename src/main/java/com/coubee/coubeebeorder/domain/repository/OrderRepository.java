@@ -20,6 +20,21 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     /**
+     * Find orders with detailed information (items and payment) by user ID
+     * Uses fetch join to avoid N+1 problem when loading order details
+     *
+     * @param userId user ID
+     * @param pageable pagination information
+     * @return page of orders with items and payment details loaded
+     */
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items " +
+           "LEFT JOIN FETCH o.payment " +
+           "WHERE o.userId = :userId " +
+           "ORDER BY o.createdAt DESC")
+    Page<Order> findOrdersWithDetailsByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    /**
      * V3: 결제 완료 시점 범위로 주문 조회
      * 특정 시간 범위 내에 결제 완료된 주문들을 조회합니다.
      *

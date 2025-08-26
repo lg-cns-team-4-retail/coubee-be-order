@@ -55,6 +55,9 @@ public class Order extends BaseTimeEntity {
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private Payment payment;
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderTimestamp> statusHistory = new ArrayList<>();
+
     @Builder
     private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer totalAmount, String recipientName, String orderToken, String orderQR, Long paidAtUnix) {
         this.orderId = orderId;
@@ -86,6 +89,10 @@ public class Order extends BaseTimeEntity {
 
     public void updateStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    public void addStatusHistory(OrderTimestamp timestamp) {
+        statusHistory.add(timestamp);
     }
 
     public void setOrderToken(String orderToken) {

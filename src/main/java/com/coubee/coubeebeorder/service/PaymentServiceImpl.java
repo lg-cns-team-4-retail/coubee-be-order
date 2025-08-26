@@ -40,6 +40,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final OrderService orderService;
     private final KafkaMessageProducer kafkaMessageProducer;
     private final PortOneWebhookVerifier webhookVerifier;
     private final ObjectMapper objectMapper;
@@ -159,7 +160,7 @@ public class PaymentServiceImpl implements PaymentService {
             log.error("결제 금액 불일치! 주문 금액: {}, 실제 결제 금액: {}. 자동 취소를 시도합니다.", order.getTotalAmount(), paidAmount);
             cancelMismatchedPayment(transactionId, merchantUid);
             payment.updateFailedStatus();
-            order.updateStatus(OrderStatus.FAILED);
+            orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.FAILED);
             return false;
         }
 
@@ -168,7 +169,7 @@ public class PaymentServiceImpl implements PaymentService {
                 pgTransactionId,
                 receiptUrl
         );
-        order.updateStatus(OrderStatus.PAID);
+        orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
 
         // V3: 결제 완료 시점을 UNIX 타임스탬프로 설정
         order.markAsPaidNow();
@@ -264,7 +265,7 @@ public class PaymentServiceImpl implements PaymentService {
             paymentRepository.save(payment);
             
             // 주문 상태 업데이트
-            order.updateStatus(OrderStatus.PAID);
+            orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
 
             // V3: 결제 완료 시점을 UNIX 타임스탬프로 설정
             order.markAsPaidNow();

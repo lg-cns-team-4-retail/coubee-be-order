@@ -1,5 +1,6 @@
 package com.coubee.coubeebeorder.service;
 
+import com.coubee.coubeebeorder.domain.OrderStatus;
 import com.coubee.coubeebeorder.domain.dto.OrderCancelRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderCreateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderCreateResponse;
@@ -8,6 +9,7 @@ import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface OrderService {
@@ -18,11 +20,19 @@ public interface OrderService {
 
     OrderStatusResponse getOrderStatus(String orderId);
 
-    OrderListResponse getUserOrders(Long userId, Pageable pageable);
+    Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable);
 
     OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request);
 
     OrderDetailResponse receiveOrder(String orderId);
 
     OrderStatusUpdateResponse updateOrderStatus(String orderId, OrderStatusUpdateRequest request, Long userId);
+
+    /**
+     * Updates order status with history tracking (for internal service use)
+     *
+     * @param orderId the order ID
+     * @param newStatus the new status
+     */
+    void updateOrderStatusWithHistory(String orderId, OrderStatus newStatus);
 }
