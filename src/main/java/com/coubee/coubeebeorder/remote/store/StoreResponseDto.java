@@ -1,9 +1,11 @@
 package com.coubee.coubeebeorder.remote.store;
 
 import lombok.Data;
+import java.util.List;
 
 /**
  * Store response DTO that matches the store service response structure
+ * [수정됨] store-service의 실제 응답과 필드명을 일치시켰습니다.
  */
 @Data
 public class StoreResponseDto {
@@ -14,15 +16,24 @@ public class StoreResponseDto {
     
     private String description;
     
-    private String storeImg;
+    // storeImg -> profileImg 로 변경
+    private String profileImg;
+
+    // backImg 필드 추가
+    private String backImg;
     
-    private String address;
+    // address -> storeAddress 로 변경
+    private String storeAddress;
     
-    private String phoneNumber;
+    // phoneNumber -> contactNo 로 변경
+    private String contactNo;
     
-    private String businessHours;
+    // businessHours -> workingHour 로 변경
+    private String workingHour;
     
-    private String category;
+    // category(String) -> storeTag(List<CategoryDto>) 로 변경
+    private List<CategoryDto> storeTag;
     
-    private Long ownerId;
+    // store-service 응답에는 ownerId가 없으므로 제거
+    // private Long ownerId;
 }
