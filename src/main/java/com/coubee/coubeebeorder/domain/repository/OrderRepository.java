@@ -30,9 +30,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT DISTINCT o FROM Order o " +
            "LEFT JOIN FETCH o.items " +
            "LEFT JOIN FETCH o.payment " +
-           "WHERE o.userId = :userId " +
-           "ORDER BY o.createdAt DESC")
-    Page<Order> findOrdersWithDetailsByUserId(@Param("userId") Long userId, Pageable pageable);
+           "WHERE o IN :orders")
+    List<Order> findWithDetailsIn(@Param("orders") List<Order> orders);
 
     /**
      * V3: 결제 완료 시점 범위로 주문 조회

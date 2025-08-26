@@ -1,4 +1,4 @@
-package com.coubee.coubeebeorder.remote.dto;
+package com.coubee.coubeebeorder.remote.product;
 
 import lombok.Data;
 

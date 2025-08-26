@@ -1,6 +1,8 @@
 package com.coubee.coubeebeorder.domain.dto;
 
 import com.coubee.coubeebeorder.domain.OrderStatus;
+import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
+import com.coubee.coubeebeorder.remote.store.StoreResponseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
@@ -42,15 +44,18 @@ public class OrderDetailResponse {
     @Schema(description = "Payment completion time (UNIX timestamp)", example = "1672531200")
     private Long paidAtUnix;
 
+    @Schema(description = "Store details")
+    private StoreResponseDto store;
+
     @Schema(description = "Order item list")
     private List<OrderItemResponse> items;
 
     @Schema(description = "Payment information")
     private PaymentResponse payment;
-
-    @Getter
     @Builder
     public static class OrderItemResponse {
+        @Schema(description = "Full product details")
+        private ProductResponseDto product;
         @Schema(description = "Product ID", example = "1")
         private Long productId;
 

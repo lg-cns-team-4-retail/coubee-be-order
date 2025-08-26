@@ -1,7 +1,7 @@
 package com.coubee.coubeebeorder.remote.product;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
-import com.coubee.coubeebeorder.remote.dto.ProductResponseDto;
+import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

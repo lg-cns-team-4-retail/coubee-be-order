@@ -12,7 +12,8 @@ import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
 import com.coubee.coubeebeorder.kafka.producer.product.event.StockIncreaseEvent;
 import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
 import com.coubee.coubeebeorder.remote.product.ProductClient;
-import com.coubee.coubeebeorder.remote.dto.ProductResponseDto;
+import com.coubee.coubeebeorder.remote.store.StoreClient;
+import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 // import io.portone.sdk.server.payment.CancelPaymentRequest; // Not available in current SDK version
 import io.portone.sdk.server.payment.PaymentClient;
 import feign.FeignException;
@@ -21,6 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
+import com.coubee.coubeebeorder.remote.store.StoreResponseDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +44,7 @@ public class OrderServiceImpl implements OrderService {
     // ✅✅✅ FeignClient 대신 공식 SDK 클라이언트를 주입받습니다. ✅✅✅
     private final PaymentClient portonePaymentClient;
     private final ProductClient productClient;
+    private final StoreClient storeClient;
 
     @Override
     @Transactional
@@ -214,11 +218,22 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable) {
-        log.info("Getting detailed orders for user: {}", userId);
+        // 1. 
+        Page<Order> orderPage = orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        List<Order> orders = orderPage.getContent();
 
-        Page<Order> orderPage = orderRepository.findOrdersWithDetailsByUserId(userId, pageable);
+        if (orders.isEmpty()) {
+            return Page.empty(pageable);
+        }
 
-        return orderPage.map(this::convertToOrderDetailResponse);
+        // 2. 
+        List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orders);
+
+        // 3. 
+        Page<Order> finalOrderPage = new PageImpl<>(ordersWithDetails, pageable, orderPage.getTotalElements());
+
+        // 4. DTO
+        return finalOrderPage.map(this::convertToOrderDetailResponse);
     }
 
     @Override
@@ -356,26 +371,40 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private OrderDetailResponse convertToOrderDetailResponse(Order order) {
+        // Fetch store details
+        ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
+        StoreResponseDto storeDetails = storeResponse.getData();
+
+        // Fetch product details for each item
+        List<OrderDetailResponse.OrderItemResponse> itemResponses = order.getItems().stream()
+                .map(item -> {
+                    ApiResponseDto<ProductResponseDto> productResponse = productClient.getProductById(item.getProductId(), order.getUserId());
+                    ProductResponseDto productDetails = productResponse.getData();
+
+                    return OrderDetailResponse.OrderItemResponse.builder()
+                            .product(productDetails) // Full product details
+                            .productId(item.getProductId())
+                            .productName(item.getProductName())
+                            .quantity(item.getQuantity())
+                            .price(item.getPrice())
+                            .totalPrice(item.getTotalPrice())
+                            .eventType(item.getEventType() != null ? item.getEventType().name() : null)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
         return OrderDetailResponse.builder()
                 .orderId(order.getOrderId())
                 .userId(order.getUserId())
                 .storeId(order.getStoreId())
+                .store(storeDetails) // Full store details
                 .status(order.getStatus())
                 .totalAmount(order.getTotalAmount())
                 .recipientName(order.getRecipientName())
                 .orderToken(order.getOrderToken())
                 .orderQR(order.getOrderQR())
-                .paidAtUnix(order.getPaidAtUnix()) // V3: 결제 완료 시점 UNIX 타임스탬프 추가
-                .items(order.getItems().stream()
-                        .map(item -> OrderDetailResponse.OrderItemResponse.builder()
-                                .productId(item.getProductId())
-                                .productName(item.getProductName())
-                                .quantity(item.getQuantity())
-                                .price(item.getPrice())
-                                .totalPrice(item.getTotalPrice())
-                                .eventType(item.getEventType() != null ? item.getEventType().name() : null) // V3: 이벤트 타입 추가
-                                .build())
-                        .collect(Collectors.toList()))
+                .paidAtUnix(order.getPaidAtUnix())
+                .items(itemResponses)
                 .payment(order.getPayment() != null ?
                         OrderDetailResponse.PaymentResponse.builder()
                                 .paymentId(order.getPayment().getPaymentId())
