@@ -4,14 +4,18 @@ import com.coubee.coubeebeorder.domain.OrderStatus;
 import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import com.coubee.coubeebeorder.remote.store.StoreResponseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrderDetailResponse {
 
     @Schema(description = "Order ID", example = "order_b7833686f25b48e0862612345678abcd")
@@ -52,7 +56,11 @@ public class OrderDetailResponse {
 
     @Schema(description = "Payment information")
     private PaymentResponse payment;
+
+    @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class OrderItemResponse {
         @Schema(description = "Full product details")
         private ProductResponseDto product;
@@ -77,6 +85,8 @@ public class OrderDetailResponse {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PaymentResponse {
         @Schema(description = "Payment ID", example = "payment_01H1J5BFXCZDMG8RP0WCTFSN5Y")
         private String paymentId;
