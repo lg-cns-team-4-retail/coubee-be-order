@@ -1,0 +1,1 @@
+UPDATE orders SET status = 'CANCELLED_ADMIN' WHERE status = 'CANCELLED';

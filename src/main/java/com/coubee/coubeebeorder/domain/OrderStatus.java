@@ -11,7 +11,9 @@ public enum OrderStatus {
     PREPARING("Preparing"),
     PREPARED("Prepared"),
     RECEIVED("Received"),
-    CANCELLED("Cancelled"),
+//    CANCELLED("Cancelled"),
+    CANCELLED_USER("Cancelled by User"),
+    CANCELLED_ADMIN("Cancelled by Admin"),
     FAILED("Failed");
 
     private final String description;

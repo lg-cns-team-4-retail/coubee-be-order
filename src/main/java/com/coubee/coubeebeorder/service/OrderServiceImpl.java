@@ -129,14 +129,25 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request) {
-        log.info("Cancelling order: {} with reason: {}", orderId, request.getCancelReason());
+    public OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request, Long userId, String userRole) {
+        log.info("Cancelling order: {} by user: {} with role: {}", orderId, userId, userRole);
 
         Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다. Order ID: " + orderId));
 
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.RECEIVED) {
-            throw new InvalidStatusTransitionException(order.getStatus(), OrderStatus.CANCELLED);
+        // Determine the new cancel status based on user role
+        OrderStatus newCancelStatus;
+        if ("ROLE_ADMIN".equals(userRole) || "ROLE_SUPER_ADMIN".equals(userRole)) {
+            newCancelStatus = OrderStatus.CANCELLED_ADMIN;
+        } else if (order.getUserId().equals(userId)) {
+            newCancelStatus = OrderStatus.CANCELLED_USER;
+        } else {
+            throw new IllegalArgumentException("주문을 취소할 권한이 없습니다.");
+        }
+
+        // Check if the order is already cancelled or received
+        if (order.getStatus() == OrderStatus.CANCELLED_USER || order.getStatus() == OrderStatus.CANCELLED_ADMIN || order.getStatus() == OrderStatus.RECEIVED) {
+            throw new InvalidStatusTransitionException(order.getStatus(), newCancelStatus);
         }
 
         if (order.getPayment() != null && order.getPayment().getStatus() == PaymentStatus.PAID) {
@@ -150,8 +161,12 @@ public class OrderServiceImpl implements OrderService {
                     throw new ApiError("취소할 결제 정보(PG Transaction ID)가 없습니다.");
                 }
 
+                String cancelReason = (request != null && request.getCancelReason() != null)
+                        ? request.getCancelReason()
+                        : "No reason provided";
+
                 log.warn("Payment cancellation needed but CancelPaymentRequest not available in SDK version 0.19.2");
-                log.warn("Transaction ID: {}, Reason: {}", transactionId, request.getCancelReason());
+                log.warn("Transaction ID: {}, Reason: {}", transactionId, cancelReason);
 
                 order.getPayment().updateCancelledStatus();
                 log.info("Payment cancelled successfully for order: {}", orderId);
@@ -162,7 +177,7 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        updateOrderStatusAndCreateHistory(order, OrderStatus.CANCELLED);
+        updateOrderStatusAndCreateHistory(order, newCancelStatus);
 
         // V3: 주문 취소 시 모든 주문 아이템의 이벤트 타입을 REFUND로 설정
         order.getItems().forEach(item -> item.updateEventType(EventType.REFUND));
@@ -170,7 +185,7 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
         publishStockIncreaseEvent(order);
 
-        log.info("Order cancelled successfully: {}", orderId);
+        log.info("Order cancelled successfully: {}. New status: {}", orderId, newCancelStatus);
         return convertToOrderDetailResponse(order);
     }
 
@@ -268,11 +283,11 @@ public class OrderServiceImpl implements OrderService {
 
     private void validateStatusTransition(OrderStatus from, OrderStatus to) {
         boolean isValidTransition = switch (from) {
-            case PENDING -> to == OrderStatus.PAID || to == OrderStatus.CANCELLED || to == OrderStatus.FAILED;
-            case PAID -> to == OrderStatus.PREPARING || to == OrderStatus.CANCELLED || to == OrderStatus.FAILED;
-            case PREPARING -> to == OrderStatus.PREPARED || to == OrderStatus.CANCELLED || to == OrderStatus.FAILED;
-            case PREPARED -> to == OrderStatus.RECEIVED || to == OrderStatus.CANCELLED;
-            case RECEIVED, CANCELLED, FAILED -> false; // Terminal states
+            case PENDING -> to == OrderStatus.PAID || to == OrderStatus.CANCELLED_USER || to == OrderStatus.CANCELLED_ADMIN || to == OrderStatus.FAILED;
+            case PAID -> to == OrderStatus.PREPARING || to == OrderStatus.CANCELLED_USER || to == OrderStatus.CANCELLED_ADMIN || to == OrderStatus.FAILED;
+            case PREPARING -> to == OrderStatus.PREPARED || to == OrderStatus.CANCELLED_USER || to == OrderStatus.CANCELLED_ADMIN || to == OrderStatus.FAILED;
+            case PREPARED -> to == OrderStatus.RECEIVED || to == OrderStatus.CANCELLED_USER || to == OrderStatus.CANCELLED_ADMIN;
+            case RECEIVED, FAILED, CANCELLED_USER, CANCELLED_ADMIN -> false; // Terminal states
         };
 
         if (!isValidTransition) {

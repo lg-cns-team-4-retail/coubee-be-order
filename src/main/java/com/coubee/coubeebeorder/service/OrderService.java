@@ -22,7 +22,7 @@ public interface OrderService {
 
     Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable);
 
-    OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request);
+    OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request, Long userId, String userRole);
 
     OrderDetailResponse receiveOrder(String orderId);
 

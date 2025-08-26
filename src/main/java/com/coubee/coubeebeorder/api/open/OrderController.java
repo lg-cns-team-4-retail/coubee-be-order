@@ -77,8 +77,12 @@ public class OrderController {
     public ApiResponseDto<OrderDetailResponse> cancelOrder(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
             @PathVariable String orderId,
-            @Valid @RequestBody OrderCancelRequest request) {
-        OrderDetailResponse response = orderService.cancelOrder(orderId, request);
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
+            @Parameter(description = "User role from authentication", hidden = true)
+            @RequestHeader("X-Auth-Role") String userRole,
+            @Valid @RequestBody(required = false) OrderCancelRequest request) {
+        OrderDetailResponse response = orderService.cancelOrder(orderId, request, userId, userRole);
         return ApiResponseDto.createOk(response);
     }
 
