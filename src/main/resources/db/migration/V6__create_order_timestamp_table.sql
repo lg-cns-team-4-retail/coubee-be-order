@@ -9,7 +9,7 @@
 -- 1. order_timestamp 테이블 생성
 -- 주문의 모든 상태 변경 이력을 시간순으로 기록합니다.
 CREATE TABLE order_timestamp (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT BIGSERIAL PRIMARY KEY,
     order_id VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL,
     updated_at TIMESTAMP NOT NULL,
