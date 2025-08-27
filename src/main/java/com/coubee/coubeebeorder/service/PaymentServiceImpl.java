@@ -225,9 +225,11 @@ public class PaymentServiceImpl implements PaymentService {
             log.info("재고 감소 이벤트 발행 완료 - 결제 완료: {}", order.getOrderId());
 
             // 주문 완료 알림 이벤트도 발행
-            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createOrderCompleted(
+            String storeName = getStoreName(order.getStoreId(), order.getUserId());
+            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createPaidNotification(
                     order.getOrderId(),
-                    order.getUserId()
+                    order.getUserId(),
+                    storeName
             );
             kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
 

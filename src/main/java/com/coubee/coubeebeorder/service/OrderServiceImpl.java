@@ -378,9 +378,11 @@ public class OrderServiceImpl implements OrderService {
             log.info("재고 증가 이벤트 발행 완료 - 주문 취소: {}", order.getOrderId());
 
             // 주문 취소 알림 이벤트도 발행
-            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createOrderCancelled(
+            String storeName = getStoreName(order.getStoreId(), order.getUserId());
+            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createCancelledUserNotification(
                     order.getOrderId(),
-                    order.getUserId()
+                    order.getUserId(),
+                    storeName
             );
             kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
 

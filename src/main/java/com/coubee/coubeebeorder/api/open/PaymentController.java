@@ -103,7 +103,7 @@ public class PaymentController {
         } catch (Exception e) {
             log.error("결제 완료 이벤트 테스트 실패", e);
             return ResponseEntity.internalServerError()
-                    .body(ApiResponseDto.createError("테스트 실행 중 오류가 발생했습니다: " + e.getMessage()));
+                    .body(ApiResponseDto.createError("TEST_ERROR", "테스트 실행 중 오류가 발생했습니다: " + e.getMessage(), null));
         }
     }
 }
