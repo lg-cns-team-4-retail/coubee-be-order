@@ -18,12 +18,15 @@ import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificat
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
 import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
+import com.coubee.coubeebeorder.domain.ProcessedWebhook;
+import com.coubee.coubeebeorder.domain.repository.ProcessedWebhookRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.portone.sdk.server.payment.PaymentClient;
 import io.portone.sdk.server.payment.PaymentMethod;
 import io.portone.sdk.server.payment.PaidPayment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final ProcessedWebhookRepository processedWebhookRepository;
     private final OrderService orderService;
     private final ProductStockService productStockService;
     private final KafkaMessageProducer kafkaMessageProducer;
@@ -115,8 +119,23 @@ public class PaymentServiceImpl implements PaymentService {
     public boolean handlePaymentWebhook(String webhookId, String signature, String timestamp, String requestBody) {
         String transactionId = "unknown";
         try {
+            // 1. 웹훅 서명 검증
             if (!webhookVerifier.verifyWebhook(requestBody, webhookId, signature, timestamp)) {
                 return false;
+            }
+
+            // 2. 웹훅 ID 기반 멱등성 체크 - 데이터베이스에 저장 시도
+            if (webhookId != null && !webhookId.isBlank()) {
+                try {
+                    ProcessedWebhook processedWebhook = ProcessedWebhook.create(webhookId);
+                    processedWebhookRepository.save(processedWebhook);
+                    log.info("웹훅 ID 저장 성공 - 새로운 웹훅 처리 시작: {}", webhookId);
+                } catch (DataIntegrityViolationException e) {
+                    log.warn("이미 처리된 웹훅입니다. 멱등성 보장으로 성공 응답 반환: webhookId={}", webhookId);
+                    return true; // 이미 처리된 웹훅이므로 성공으로 응답
+                }
+            } else {
+                log.warn("웹훅 ID가 없습니다. 멱등성 체크를 건너뜁니다.");
             }
 
             PortoneWebhookPayload payload = objectMapper.readValue(requestBody, PortoneWebhookPayload.class);
@@ -133,7 +152,7 @@ public class PaymentServiceImpl implements PaymentService {
             // 임시 해결책: S2S 검증 건너뛰고 웹훅 이벤트만 믿고 처리
             // TODO: 테스트 모드 API 키 적용 후 S2S 검증 로직 복원 필요
             log.info("임시 해결책: S2S 검증 건너뛰고 웹훅 이벤트 기반으로 결제 상태 업데이트");
-            
+
             // 웹훅 이벤트 타입에 따라 처리
             String eventType = payload.getType();
             if ("Transaction.Paid".equals(eventType)) {
