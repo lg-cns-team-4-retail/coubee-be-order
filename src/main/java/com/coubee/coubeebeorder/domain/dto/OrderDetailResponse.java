@@ -57,6 +57,23 @@ public class OrderDetailResponse {
     @Schema(description = "Payment information")
     private PaymentResponse payment;
 
+    @Schema(description = "The complete history of status changes for the order, sorted chronologically.")
+    private List<OrderStatusTimestampDto> statusHistory;
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "Represents a single status change event in an order's history.")
+    public static class OrderStatusTimestampDto {
+
+        @Schema(description = "The status of the order at this point in time.", example = "PAID")
+        private OrderStatus status;
+
+        @Schema(description = "The timestamp when this status was set.", example = "2023-06-01T14:35:00")
+        private LocalDateTime updatedAt;
+    }
+
     @Getter
     @Builder
     @NoArgsConstructor
