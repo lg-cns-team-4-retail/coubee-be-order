@@ -34,6 +34,10 @@ public class StoreResponseDto {
     // category(String) -> storeTag(List<CategoryDto>) 로 변경
     private List<CategoryDto> storeTag;
     
+    private double longitude;
+    private double latitude;
+
+
     // store-service 응답에는 ownerId가 없으므로 제거
     // private Long ownerId;
 }
