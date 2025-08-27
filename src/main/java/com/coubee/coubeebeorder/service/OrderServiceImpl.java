@@ -188,6 +188,7 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.save(order);
         publishStockIncreaseEvent(order);
+        publishCancelNotificationEvent(order, newCancelStatus);
 
         log.info("Order cancelled successfully: {}. New status: {}", orderId, newCancelStatus);
         return convertToOrderDetailResponse(order);
@@ -323,6 +324,9 @@ public class OrderServiceImpl implements OrderService {
         OrderTimestamp timestamp = OrderTimestamp.createTimestamp(order, newStatus);
         order.addStatusHistory(timestamp);
 
+        // 상태 변경에 따른 알림 이벤트 발행
+        publishOrderStatusNotificationEvent(order, newStatus);
+
         log.debug("Status history recorded for order {}: {}", order.getOrderId(), newStatus);
     }
 
@@ -354,6 +358,78 @@ public class OrderServiceImpl implements OrderService {
 
         } catch (Exception e) {
             log.error("재고 증가 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
+        }
+    }
+
+    private void publishOrderStatusNotificationEvent(Order order, OrderStatus newStatus) {
+        try {
+            // PREPARING, PREPARED 상태에 대해서만 알림 이벤트 발행
+            if (newStatus == OrderStatus.PREPARING || newStatus == OrderStatus.PREPARED) {
+                String storeName = getStoreName(order.getStoreId(), order.getUserId());
+                
+                OrderNotificationEvent notificationEvent = null;
+                if (newStatus == OrderStatus.PREPARING) {
+                    notificationEvent = OrderNotificationEvent.createPreparingNotification(
+                            order.getOrderId(),
+                            order.getUserId(),
+                            storeName
+                    );
+                } else if (newStatus == OrderStatus.PREPARED) {
+                    notificationEvent = OrderNotificationEvent.createPreparedNotification(
+                            order.getOrderId(),
+                            order.getUserId(),
+                            storeName
+                    );
+                }
+                
+                if (notificationEvent != null) {
+                    kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
+                    log.info("주문 상태 변경 알림 이벤트 발행 완료 - 주문: {}, 상태: {}, 매장: {}", 
+                            order.getOrderId(), newStatus, storeName);
+                }
+            }
+        } catch (Exception e) {
+            log.error("주문 상태 변경 알림 이벤트 발행 실패 - 주문: {}, 상태: {}", 
+                    order.getOrderId(), newStatus, e);
+        }
+    }
+
+    private void publishCancelNotificationEvent(Order order, OrderStatus cancelStatus) {
+        try {
+            String storeName = getStoreName(order.getStoreId(), order.getUserId());
+            
+            OrderNotificationEvent notificationEvent = null;
+            if (cancelStatus == OrderStatus.CANCELLED_USER) {
+                notificationEvent = OrderNotificationEvent.createCancelledUserNotification(
+                        order.getOrderId(),
+                        order.getUserId(),
+                        storeName
+                );
+            } else if (cancelStatus == OrderStatus.CANCELLED_ADMIN) {
+                notificationEvent = OrderNotificationEvent.createCancelledAdminNotification(
+                        order.getOrderId(),
+                        order.getUserId(),
+                        storeName
+                );
+            }
+            
+            if (notificationEvent != null) {
+                kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
+                log.info("주문 취소 알림 이벤트 발행 완료 - 주문: {}, 상태: {}, 매장: {}", 
+                        order.getOrderId(), cancelStatus, storeName);
+            }
+        } catch (Exception e) {
+            log.error("주문 취소 알림 이벤트 발행 실패 - 주문: {}, 상태: {}", 
+                    order.getOrderId(), cancelStatus, e);
+        }
+    }
+
+    private String getStoreName(Long storeId, Long userId) {
+        try {
+            return storeClient.getStoreNameById(storeId, userId).getData();
+        } catch (Exception e) {
+            log.warn("매장명 조회 실패 - storeId: {}, userId: {}, 기본값 사용", storeId, userId, e);
+            return "매장";
         }
     }
 

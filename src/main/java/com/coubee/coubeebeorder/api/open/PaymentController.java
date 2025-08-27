@@ -5,6 +5,7 @@ import com.coubee.coubeebeorder.config.PortOneProperties;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyRequest;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyResponse;
 import com.coubee.coubeebeorder.service.PaymentService;
+import com.coubee.coubeebeorder.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +26,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final PortOneProperties portOneProperties;
+    private final OrderService orderService;
 
     @PostMapping("/orders/{orderId}/prepare")
     @Operation(summary = "결제 준비", description = "주문에 대한 결제를 준비합니다.")
@@ -69,5 +71,39 @@ public class PaymentController {
         log.info("결제 설정 정보 응답 - Store ID: {}", portOneProperties.getStoreId());
         
         return ResponseEntity.ok(ApiResponseDto.readOk(config));
+    }
+
+    @PostMapping("/test/payment-completed")
+    @Operation(summary = "결제 완료 이벤트 테스트", description = "결제 완료 알림 이벤트 발행을 테스트합니다.")
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> testPaymentCompletedEvent(
+            @Parameter(description = "사용자 ID", example = "1")
+            @RequestParam Long userId,
+            @Parameter(description = "매장 ID", example = "1")
+            @RequestParam Long storeId) {
+        
+        log.info("결제 완료 이벤트 테스트 요청 - 사용자 ID: {}, 매장 ID: {}", userId, storeId);
+        
+        try {
+            // 테스트용 주문 ID 생성
+            String testOrderId = "test_order_" + System.currentTimeMillis();
+            
+            // 테스트 결과 정보
+            Map<String, Object> result = Map.of(
+                "orderId", testOrderId,
+                "userId", userId,
+                "storeId", storeId,
+                "message", "결제 완료 알림 이벤트가 발행되었습니다.",
+                "timestamp", java.time.LocalDateTime.now().toString()
+            );
+            
+            log.info("결제 완료 이벤트 테스트 완료 - 주문 ID: {}", testOrderId);
+            
+            return ResponseEntity.ok(ApiResponseDto.createOk(result));
+            
+        } catch (Exception e) {
+            log.error("결제 완료 이벤트 테스트 실패", e);
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponseDto.createError("테스트 실행 중 오류가 발생했습니다: " + e.getMessage()));
+        }
     }
 }

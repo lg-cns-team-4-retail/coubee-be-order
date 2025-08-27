@@ -34,4 +34,17 @@ public interface StoreClient {
             @PathVariable("storeId") Long storeId,
             @RequestHeader("X-Auth-UserId") Long userId
     );
+
+    /**
+     * 스토어 ID로 스토어 이름만 조회
+     *
+     * @param storeId 조회할 스토어의 ID
+     * @param userId X-Auth-UserId 헤더의 사용자 ID (Store 서비스에서 필수)
+     * @return 스토어 이름을 포함한 ApiResponseDto
+     */
+    @GetMapping("/api/store/{storeId}/name")
+    ApiResponseDto<String> getStoreNameById(
+            @PathVariable("storeId") Long storeId,
+            @RequestHeader("X-Auth-UserId") Long userId
+    );
 }
