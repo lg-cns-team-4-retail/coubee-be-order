@@ -62,25 +62,41 @@ public class PaymentServiceImpl implements PaymentService {
         productStockService.decreaseStock(order);
         log.info("재고 감소 처리 완료 - 주문 ID: {}", orderId);
 
-        paymentRepository.findByOrder_OrderId(orderId).orElseGet(() -> {
-            Payment newPayment = Payment.createPayment(
-                    orderId,
-                    order,
-                    "CARD",
-                    order.getTotalAmount()
+        try {
+            // 재고 감소 후 로컬 DB 작업들을 try-catch로 감싸서 실패 시 보상 트랜잭션 실행
+            paymentRepository.findByOrder_OrderId(orderId).orElseGet(() -> {
+                Payment newPayment = Payment.createPayment(
+                        orderId,
+                        order,
+                        "CARD",
+                        order.getTotalAmount()
+                );
+                order.setPayment(newPayment);
+                return paymentRepository.save(newPayment);
+            });
+
+            log.info("Payment preparation completed for order: {}", orderId);
+
+            return PaymentReadyResponse.of(
+                    order.getRecipientName(),
+                    generateOrderName(order),
+                    order.getTotalAmount(),
+                    orderId
             );
-            order.setPayment(newPayment);
-            return paymentRepository.save(newPayment);
-        });
+        } catch (Exception e) {
+            // 로컬 DB 작업 실패 시 보상 트랜잭션 실행: 재고 복원
+            log.error("Payment preparation failed after stock decrement for order: {}. Executing compensating transaction.", orderId, e);
 
-        log.info("Payment preparation completed for order: {}", orderId);
+            try {
+                productStockService.increaseStock(order);
+                log.info("Compensating transaction completed: stock restored for order: {}", orderId);
+            } catch (Exception compensationException) {
+                log.error("CRITICAL: Compensating transaction failed for order: {}. Manual intervention required.", orderId, compensationException);
+            }
 
-        return PaymentReadyResponse.of(
-                order.getRecipientName(),
-                generateOrderName(order),
-                order.getTotalAmount(),
-                orderId
-        );
+            // 원본 예외를 ApiError로 래핑하여 트랜잭션 롤백 및 클라이언트 에러 응답 보장
+            throw new ApiError("결제 준비 중 오류가 발생했습니다: " + e.getMessage());
+        }
     }
 
     @Override

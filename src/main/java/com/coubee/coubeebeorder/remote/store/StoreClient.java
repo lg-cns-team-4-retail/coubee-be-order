@@ -5,6 +5,10 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Store 서비스와 통신하기 위한 Feign 클라이언트
@@ -45,6 +49,20 @@ public interface StoreClient {
     @GetMapping("/api/store/{storeId}/name")
     ApiResponseDto<String> getStoreNameById(
             @PathVariable("storeId") Long storeId,
+            @RequestHeader("X-Auth-UserId") Long userId
+    );
+
+    /**
+     * 여러 스토어 ID로 스토어 상세 정보 일괄 조회
+     * N+1 문제 해결을 위한 벌크 조회 API
+     *
+     * @param storeIds 조회할 스토어 ID 목록
+     * @param userId X-Auth-UserId 헤더의 사용자 ID (Store 서비스에서 필수)
+     * @return 스토어 ID를 키로 하는 StoreResponseDto 맵을 포함한 ApiResponseDto
+     */
+    @GetMapping("/api/store/bulk")
+    ApiResponseDto<Map<Long, StoreResponseDto>> getStoresByIds(
+            @RequestParam("storeIds") List<Long> storeIds,
             @RequestHeader("X-Auth-UserId") Long userId
     );
 }

@@ -1,11 +1,13 @@
 package com.coubee.coubeebeorder.service;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import com.coubee.coubeebeorder.common.exception.ApiError;
 import com.coubee.coubeebeorder.domain.Order;
 import com.coubee.coubeebeorder.domain.OrderItem;
 import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.product.StockUpdateRequest;
 import com.coubee.coubeebeorder.remote.product.StockUpdateResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class ProductStockServiceImpl implements ProductStockService {
     private final ProductClient productClient;
 
     @Override
+    @CircuitBreaker(name = "productStock", fallbackMethod = "decreaseStockFallback")
     public void decreaseStock(Order order) {
         log.info("재고 감소 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
 
@@ -50,7 +53,7 @@ public class ProductStockServiceImpl implements ProductStockService {
                 logStockUpdateDetails(response.getData(), "감소");
             } else {
                 log.error("재고 감소 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
-                throw new RuntimeException("재고 감소에 실패했습니다: " + 
+                throw new RuntimeException("재고 감소에 실패했습니다: " +
                     (response.getData() != null ? response.getData().getMessage() : "알 수 없는 오류"));
             }
 
@@ -61,6 +64,7 @@ public class ProductStockServiceImpl implements ProductStockService {
     }
 
     @Override
+    @CircuitBreaker(name = "productStock", fallbackMethod = "increaseStockFallback")
     public void increaseStock(Order order) {
         log.info("재고 증가 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
 
@@ -103,10 +107,31 @@ public class ProductStockServiceImpl implements ProductStockService {
     private void logStockUpdateDetails(StockUpdateResponse response, String operation) {
         if (response.getUpdatedItems() != null) {
             for (StockUpdateResponse.UpdatedStockItem item : response.getUpdatedItems()) {
-                log.info("재고 {} 상세 - 상품 ID: {}, 이전 재고: {}, 현재 재고: {}, 변경량: {}", 
-                    operation, item.getProductId(), item.getPreviousStock(), 
+                log.info("재고 {} 상세 - 상품 ID: {}, 이전 재고: {}, 현재 재고: {}, 변경량: {}",
+                    operation, item.getProductId(), item.getPreviousStock(),
                     item.getCurrentStock(), item.getQuantityChange());
             }
         }
+    }
+
+    /**
+     * 재고 감소 Circuit Breaker 폴백 메서드
+     * Product Service가 불가능할 때 즉시 결제 준비를 실패시킵니다.
+     */
+    public void decreaseStockFallback(Order order, Exception ex) {
+        log.error("Circuit breaker activated for decreaseStock - 주문 ID: {}, 매장 ID: {}. Product Service 불가능.",
+                order.getOrderId(), order.getStoreId(), ex);
+        throw new ApiError("상품 서비스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    /**
+     * 재고 증가 Circuit Breaker 폴백 메서드
+     * 보상 트랜잭션이므로 예외를 던지지 않고 CRITICAL 로그만 남깁니다.
+     */
+    public void increaseStockFallback(Order order, Exception ex) {
+        log.error("CRITICAL: Circuit breaker activated for increaseStock - 주문 ID: {}, 매장 ID: {}. " +
+                "보상 트랜잭션 실패로 수동 개입이 필요합니다.",
+                order.getOrderId(), order.getStoreId(), ex);
+        // 보상 트랜잭션이므로 예외를 던지지 않음 - 주문 취소 플로우를 중단하지 않기 위함
     }
 }

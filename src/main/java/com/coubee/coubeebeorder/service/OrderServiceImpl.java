@@ -16,6 +16,7 @@ import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 // import io.portone.sdk.server.payment.CancelPaymentRequest; // Not available in current SDK version
 import io.portone.sdk.server.payment.PaymentClient;
 import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -257,16 +260,16 @@ public class OrderServiceImpl implements OrderService {
         reorderedOrders.forEach(order -> log.debug("재정렬 후: orderId={}, createdAt={}", 
                 order.getOrderId(), order.getCreatedAt()));
 
-        // 4. 최종 Page 객체 생성
-        Page<Order> finalOrderPage = new PageImpl<>(reorderedOrders, pageable, orderPage.getTotalElements());
+        // 4. 벌크 DTO 변환 (N+1 문제 해결)
+        List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(reorderedOrders);
 
-        // 5. DTO 변환
-        Page<OrderDetailResponse> result = finalOrderPage.map(this::convertToOrderDetailResponse);
-        
+        // 5. 최종 Page 객체 생성
+        Page<OrderDetailResponse> result = new PageImpl<>(orderDetailResponses, pageable, orderPage.getTotalElements());
+
         log.info("최종 결과 - 총 {}개 주문 반환", result.getContent().size());
-        result.getContent().forEach(orderResponse -> log.debug("최종 응답: orderId={}, createdAt={}", 
+        result.getContent().forEach(orderResponse -> log.debug("최종 응답: orderId={}, createdAt={}",
                 orderResponse.getOrderId(), orderResponse.getCreatedAt()));
-        
+
         return result;
     }
 
@@ -450,16 +453,130 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private OrderDetailResponse convertToOrderDetailResponse(Order order) {
-        // Fetch store details
-        ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
-        StoreResponseDto storeDetails = storeResponse.getData();
+    /**
+     * 주문 목록을 벌크 API 호출을 사용하여 OrderDetailResponse 목록으로 변환
+     * N+1 문제를 해결하기 위해 모든 필요한 데이터를 한 번에 조회합니다.
+     */
+    private List<OrderDetailResponse> convertToOrderDetailResponseList(List<Order> orders) {
+        if (orders.isEmpty()) {
+            return new ArrayList<>();
+        }
 
-        // Fetch product details for each item
+        // 1. 모든 고유한 storeId와 productId 수집
+        Set<Long> storeIds = orders.stream()
+                .map(Order::getStoreId)
+                .collect(Collectors.toSet());
+
+        Set<Long> productIds = orders.stream()
+                .flatMap(order -> order.getItems().stream())
+                .map(OrderItem::getProductId)
+                .collect(Collectors.toSet());
+
+        // 2. 벌크 API 호출로 모든 데이터를 한 번에 조회
+        Map<Long, StoreResponseDto> storeMap = getBulkStoreData(storeIds, orders.get(0).getUserId());
+        Map<Long, ProductResponseDto> productMap = getBulkProductData(productIds, orders.get(0).getUserId());
+
+        // 3. 조회된 데이터를 사용하여 OrderDetailResponse 목록 생성
+        return orders.stream()
+                .map(order -> convertToOrderDetailResponseWithMaps(order, storeMap, productMap))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 벌크 스토어 데이터 조회 (Circuit Breaker 적용)
+     */
+    @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getBulkStoreDataFallback")
+    private Map<Long, StoreResponseDto> getBulkStoreData(Set<Long> storeIds, Long userId) {
+        if (storeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> storeIdList = new ArrayList<>(storeIds);
+        ApiResponseDto<Map<Long, StoreResponseDto>> response = storeClient.getStoresByIds(storeIdList, userId);
+        return response.getData() != null ? response.getData() : Map.of();
+    }
+
+    /**
+     * 벌크 상품 데이터 조회 (Circuit Breaker 적용)
+     */
+    @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getBulkProductDataFallback")
+    private Map<Long, ProductResponseDto> getBulkProductData(Set<Long> productIds, Long userId) {
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> productIdList = new ArrayList<>(productIds);
+        ApiResponseDto<Map<Long, ProductResponseDto>> response = productClient.getProductsByIds(productIdList, userId);
+        return response.getData() != null ? response.getData() : Map.of();
+    }
+
+    /**
+     * 미리 조회된 맵 데이터를 사용하여 OrderDetailResponse 생성
+     */
+    private OrderDetailResponse convertToOrderDetailResponseWithMaps(Order order,
+                                                                     Map<Long, StoreResponseDto> storeMap,
+                                                                     Map<Long, ProductResponseDto> productMap) {
+        // 스토어 정보 조회 (폴백 데이터 사용 가능)
+        StoreResponseDto storeDetails = storeMap.get(order.getStoreId());
+        if (storeDetails == null) {
+            log.warn("Store data not found for storeId: {}. Using fallback.", order.getStoreId());
+            storeDetails = createFallbackStoreData(order.getStoreId());
+        }
+
+        // 주문 아이템 응답 생성
         List<OrderDetailResponse.OrderItemResponse> itemResponses = order.getItems().stream()
                 .map(item -> {
-                    ApiResponseDto<ProductResponseDto> productResponse = productClient.getProductById(item.getProductId(), order.getUserId());
-                    ProductResponseDto productDetails = productResponse.getData();
+                    ProductResponseDto productDetails = productMap.get(item.getProductId());
+                    if (productDetails == null) {
+                        log.warn("Product data not found for productId: {}. Using fallback.", item.getProductId());
+                        productDetails = createFallbackProductData(item.getProductId());
+                    }
+
+                    return OrderDetailResponse.OrderItemResponse.builder()
+                            .product(productDetails)
+                            .productId(item.getProductId())
+                            .productName(item.getProductName())
+                            .quantity(item.getQuantity())
+                            .price(item.getPrice())
+                            .totalPrice(item.getTotalPrice())
+                            .eventType(item.getEventType() != null ? item.getEventType().name() : null)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return OrderDetailResponse.builder()
+                .orderId(order.getOrderId())
+                .userId(order.getUserId())
+                .storeId(order.getStoreId())
+                .store(storeDetails)
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .recipientName(order.getRecipientName())
+                .orderToken(order.getOrderToken())
+                .orderQR(order.getOrderQR())
+                .paidAtUnix(order.getPaidAtUnix())
+                .items(itemResponses)
+                .payment(order.getPayment() != null ?
+                        OrderDetailResponse.PaymentResponse.builder()
+                                .paymentId(order.getPayment().getPaymentId())
+                                .pgProvider(order.getPayment().getPgProvider())
+                                .method(order.getPayment().getMethod())
+                                .amount(order.getPayment().getAmount())
+                                .status(order.getPayment().getStatus().name())
+                                .paidAt(order.getPayment().getPaidAt())
+                                .build() : null)
+                .createdAt(order.getCreatedAt())
+                .build();
+    }
+
+    private OrderDetailResponse convertToOrderDetailResponse(Order order) {
+        // Fetch store details with circuit breaker
+        StoreResponseDto storeDetails = getStoreDetailsWithCircuitBreaker(order.getStoreId(), order.getUserId());
+
+        // Fetch product details for each item with circuit breaker
+        List<OrderDetailResponse.OrderItemResponse> itemResponses = order.getItems().stream()
+                .map(item -> {
+                    ProductResponseDto productDetails = getProductDetailsWithCircuitBreaker(item.getProductId(), order.getUserId());
 
                     return OrderDetailResponse.OrderItemResponse.builder()
                             .product(productDetails) // Full product details
@@ -507,5 +624,115 @@ public class OrderServiceImpl implements OrderService {
                 .orderName(generateOrderName(order.getItems()))
                 .createdAt(order.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Circuit breaker로 보호되는 스토어 정보 조회
+     */
+    @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getStoreDetailsFallback")
+    private StoreResponseDto getStoreDetailsWithCircuitBreaker(Long storeId, Long userId) {
+        ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(storeId, userId);
+        return storeResponse.getData();
+    }
+
+    /**
+     * Circuit breaker로 보호되는 상품 정보 조회
+     */
+    @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getProductDetailsFallback")
+    private ProductResponseDto getProductDetailsWithCircuitBreaker(Long productId, Long userId) {
+        ApiResponseDto<ProductResponseDto> productResponse = productClient.getProductById(productId, userId);
+        return productResponse.getData();
+    }
+
+    /**
+     * 스토어 정보 조회 폴백 메서드
+     */
+    private StoreResponseDto getStoreDetailsFallback(Long storeId, Long userId, Exception ex) {
+        log.warn("Circuit breaker activated for store details - Store ID: {}, User ID: {}. Using fallback data.", storeId, userId, ex);
+
+        StoreResponseDto fallbackStore = new StoreResponseDto();
+        fallbackStore.setStoreId(storeId);
+        fallbackStore.setStoreName("매장 정보 일시 불가");
+        fallbackStore.setDescription("매장 정보를 불러올 수 없습니다.");
+        fallbackStore.setStoreAddress("주소 정보 없음");
+        fallbackStore.setContactNo("연락처 정보 없음");
+        fallbackStore.setWorkingHour("영업시간 정보 없음");
+        // storeTag는 List<CategoryDto>이므로 빈 리스트로 설정
+        fallbackStore.setStoreTag(new ArrayList<>());
+
+        return fallbackStore;
+    }
+
+    /**
+     * 상품 정보 조회 폴백 메서드
+     */
+    private ProductResponseDto getProductDetailsFallback(Long productId, Long userId, Exception ex) {
+        log.warn("Circuit breaker activated for product details - Product ID: {}, User ID: {}. Using fallback data.", productId, userId, ex);
+
+        ProductResponseDto fallbackProduct = new ProductResponseDto();
+        fallbackProduct.setProductId(productId);
+        fallbackProduct.setProductName("상품 정보 일시 불가");
+        fallbackProduct.setDescription("상품 정보를 불러올 수 없습니다.");
+        fallbackProduct.setOriginPrice(0);
+        fallbackProduct.setSalePrice(0);
+        fallbackProduct.setStock(0);
+
+        return fallbackProduct;
+    }
+
+    /**
+     * 벌크 스토어 데이터 조회 폴백 메서드
+     */
+    private Map<Long, StoreResponseDto> getBulkStoreDataFallback(Set<Long> storeIds, Long userId, Exception ex) {
+        log.warn("Circuit breaker activated for bulk store data - Store IDs: {}, User ID: {}. Using fallback data.", storeIds, userId, ex);
+
+        return storeIds.stream()
+                .collect(Collectors.toMap(
+                        storeId -> storeId,
+                        this::createFallbackStoreData
+                ));
+    }
+
+    /**
+     * 벌크 상품 데이터 조회 폴백 메서드
+     */
+    private Map<Long, ProductResponseDto> getBulkProductDataFallback(Set<Long> productIds, Long userId, Exception ex) {
+        log.warn("Circuit breaker activated for bulk product data - Product IDs: {}, User ID: {}. Using fallback data.", productIds, userId, ex);
+
+        return productIds.stream()
+                .collect(Collectors.toMap(
+                        productId -> productId,
+                        this::createFallbackProductData
+                ));
+    }
+
+    /**
+     * 폴백 스토어 데이터 생성
+     */
+    private StoreResponseDto createFallbackStoreData(Long storeId) {
+        StoreResponseDto fallbackStore = new StoreResponseDto();
+        fallbackStore.setStoreId(storeId);
+        fallbackStore.setStoreName("매장 정보 일시 불가");
+        fallbackStore.setDescription("매장 정보를 불러올 수 없습니다.");
+        fallbackStore.setStoreAddress("주소 정보 없음");
+        fallbackStore.setContactNo("연락처 정보 없음");
+        fallbackStore.setWorkingHour("영업시간 정보 없음");
+        // storeTag는 List<CategoryDto>이므로 빈 리스트로 설정
+        fallbackStore.setStoreTag(new ArrayList<>());
+        return fallbackStore;
+    }
+
+    /**
+     * 폴백 상품 데이터 생성
+     */
+    private ProductResponseDto createFallbackProductData(Long productId) {
+        ProductResponseDto fallbackProduct = new ProductResponseDto();
+        fallbackProduct.setProductId(productId);
+        fallbackProduct.setProductName("상품 정보 일시 불가");
+        fallbackProduct.setDescription("상품 정보를 불러올 수 없습니다.");
+        fallbackProduct.setOriginPrice(0);
+        fallbackProduct.setSalePrice(0);
+        fallbackProduct.setStock(0);
+        return fallbackProduct;
     }
 }
