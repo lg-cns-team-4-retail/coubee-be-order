@@ -67,7 +67,8 @@ public class OrderController {
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        // Sort는 OrderService에서 처리하므로 여기서는 제거
+        PageRequest pageRequest = PageRequest.of(page, size);
         Page<OrderDetailResponse> response = orderService.getUserOrders(userId, pageRequest);
         return ApiResponseDto.readOk(response);
     }

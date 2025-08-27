@@ -219,16 +219,26 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable) {
-        // 1. 
+        log.info("getUserOrders 호출 - userId: {}, pageable: {}", userId, pageable);
+        
+        // 1. 기본 정렬된 주문 조회
         Page<Order> orderPage = orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
         List<Order> orders = orderPage.getContent();
+        
+        log.info("1단계 - 정렬된 주문 조회 완료. 총 {}개 주문", orders.size());
+        orders.forEach(order -> log.debug("정렬된 주문: orderId={}, createdAt={}", 
+                order.getOrderId(), order.getCreatedAt()));
 
         if (orders.isEmpty()) {
             return Page.empty(pageable);
         }
 
-        // 2. 
+        // 2. 상세 정보 포함 조회
         List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orders);
+        
+        log.info("2단계 - 상세 정보 조회 완료. 총 {}개 주문", ordersWithDetails.size());
+        ordersWithDetails.forEach(order -> log.debug("상세 조회 후: orderId={}, createdAt={}", 
+                order.getOrderId(), order.getCreatedAt()));
 
         // 3. 순서 보장을 위해 재정렬
         java.util.Map<Long, Order> orderMap = ordersWithDetails.stream()
@@ -237,12 +247,22 @@ public class OrderServiceImpl implements OrderService {
         List<Order> reorderedOrders = orders.stream()
                 .map(order -> orderMap.get(order.getId()))
                 .collect(java.util.stream.Collectors.toList());
+                
+        log.info("3단계 - 재정렬 완료. 총 {}개 주문", reorderedOrders.size());
+        reorderedOrders.forEach(order -> log.debug("재정렬 후: orderId={}, createdAt={}", 
+                order.getOrderId(), order.getCreatedAt()));
 
-        // 4. 
+        // 4. 최종 Page 객체 생성
         Page<Order> finalOrderPage = new PageImpl<>(reorderedOrders, pageable, orderPage.getTotalElements());
 
-        // 4. DTO
-        return finalOrderPage.map(this::convertToOrderDetailResponse);
+        // 5. DTO 변환
+        Page<OrderDetailResponse> result = finalOrderPage.map(this::convertToOrderDetailResponse);
+        
+        log.info("최종 결과 - 총 {}개 주문 반환", result.getContent().size());
+        result.getContent().forEach(orderResponse -> log.debug("최종 응답: orderId={}, createdAt={}", 
+                orderResponse.getOrderId(), orderResponse.getCreatedAt()));
+        
+        return result;
     }
 
     @Override
