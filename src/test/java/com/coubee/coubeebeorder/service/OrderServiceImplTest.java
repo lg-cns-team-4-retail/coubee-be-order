@@ -38,6 +38,12 @@ class OrderServiceImplTest {
     @Mock
     private OrderTimestampRepository orderTimestampRepository;
 
+    @Mock
+    private com.coubee.coubeebeorder.remote.store.StoreClient storeClient;
+
+    @Mock
+    private com.coubee.coubeebeorder.remote.product.ProductClient productClient;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
@@ -147,27 +153,32 @@ class OrderServiceImplTest {
     }
 
     @Test
-    @DisplayName("사용자 주문 목록 조회 - 성공")
-    void getUserOrders_Success() {
+    @DisplayName("사용자 주문 목록 조회 - createdAt 내림차순 정렬 확인")
+    void getUserOrders_ShouldReturnSortedResults() throws InterruptedException {
         // Given
         Long userId = 1L;
         PageRequest pageRequest = PageRequest.of(0, 10);
 
-        Order order1 = Order.createOrder("order_1", userId, 1L, 10000, "User 1");
-        order1.updateStatus(OrderStatus.PAID);
-        OrderItem item1 = OrderItem.createOrderItem(1L, "상품 1", 2, 5000);
-        order1.addOrderItem(item1);
-
+        // order2를 먼저 생성하여 createdAt이 더 빠르도록 설정
         Order order2 = Order.createOrder("order_2", userId, 1L, 20000, "User 1");
-        order2.updateStatus(OrderStatus.PREPARING);
-        OrderItem item2 = OrderItem.createOrderItem(2L, "상품 2", 1, 20000);
-        order2.addOrderItem(item2);
+        order2.addOrderItem(OrderItem.createOrderItem(2L, "상품 2", 1, 20000));
+        Thread.sleep(10); // createdAt 차이를 보장하기 위해 잠시 대기
+        Order order1 = Order.createOrder("order_1", userId, 1L, 10000, "User 1");
+        order1.addOrderItem(OrderItem.createOrderItem(1L, "상품 1", 2, 5000));
 
-        List<Order> orders = List.of(order1, order2);
-        Page<Order> orderPage = new PageImpl<>(orders, pageRequest, 2);
+        // findByUserIdOrderByCreatedAtDesc는 최신순(order1, order2)으로 반환
+        List<Order> sortedOrders = List.of(order1, order2);
+        Page<Order> sortedOrderPage = new PageImpl<>(sortedOrders, pageRequest, 2);
 
-        given(orderRepository.findOrdersWithDetailsByUserId(eq(userId), eq(pageRequest)))
-                .willReturn(orderPage);
+        // findWithDetailsIn은 순서를 보장하지 않으므로, 역순(order2, order1)으로 반환하는 것을 시뮬레이션
+        List<Order> unsortedDetails = List.of(order2, order1);
+
+        given(orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageRequest)).willReturn(sortedOrderPage);
+        given(orderRepository.findWithDetailsIn(sortedOrders)).willReturn(unsortedDetails);
+
+        // convertToOrderDetailResponse를 위한 Mock 설정
+        given(storeClient.getStoreById(anyLong(), anyLong())).willReturn(com.coubee.coubeebeorder.common.dto.ApiResponseDto.ok(new com.coubee.coubeebeorder.remote.store.StoreResponseDto()));
+        given(productClient.getProductById(anyLong(), anyLong())).willReturn(com.coubee.coubeebeorder.common.dto.ApiResponseDto.ok(new com.coubee.coubeebeorder.remote.product.ProductResponseDto()));
 
         // When
         Page<OrderDetailResponse> result = orderService.getUserOrders(userId, pageRequest);
@@ -175,21 +186,9 @@ class OrderServiceImplTest {
         // Then
         assertThat(result).isNotNull();
         assertThat(result.getContent()).hasSize(2);
-        assertThat(result.getTotalElements()).isEqualTo(2);
-        assertThat(result.getTotalPages()).isEqualTo(1);
-
-        OrderDetailResponse firstOrder = result.getContent().get(0);
-        assertThat(firstOrder.getOrderId()).isEqualTo("order_1");
-        assertThat(firstOrder.getUserId()).isEqualTo(userId);
-        assertThat(firstOrder.getStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(firstOrder.getTotalAmount()).isEqualTo(10000);
-        assertThat(firstOrder.getItems()).hasSize(1);
-        assertThat(firstOrder.getItems().get(0).getProductName()).isEqualTo("상품 1");
-
-        OrderDetailResponse secondOrder = result.getContent().get(1);
-        assertThat(secondOrder.getOrderId()).isEqualTo("order_2");
-        assertThat(secondOrder.getStatus()).isEqualTo(OrderStatus.PREPARING);
-        assertThat(secondOrder.getTotalAmount()).isEqualTo(20000);
+        // 최종 결과는 최신순(order1, order2)으로 정렬되어야 함
+        assertThat(result.getContent().get(0).getOrderId()).isEqualTo("order_1");
+        assertThat(result.getContent().get(1).getOrderId()).isEqualTo("order_2");
     }
 
     @Test

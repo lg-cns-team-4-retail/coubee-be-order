@@ -230,8 +230,16 @@ public class OrderServiceImpl implements OrderService {
         // 2. 
         List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orders);
 
-        // 3. 
-        Page<Order> finalOrderPage = new PageImpl<>(ordersWithDetails, pageable, orderPage.getTotalElements());
+        // 3. 순서 보장을 위해 재정렬
+        java.util.Map<Long, Order> orderMap = ordersWithDetails.stream()
+                .collect(java.util.stream.Collectors.toMap(Order::getId, order -> order));
+
+        List<Order> reorderedOrders = orders.stream()
+                .map(order -> orderMap.get(order.getId()))
+                .collect(java.util.stream.Collectors.toList());
+
+        // 4. 
+        Page<Order> finalOrderPage = new PageImpl<>(reorderedOrders, pageable, orderPage.getTotalElements());
 
         // 4. DTO
         return finalOrderPage.map(this::convertToOrderDetailResponse);
