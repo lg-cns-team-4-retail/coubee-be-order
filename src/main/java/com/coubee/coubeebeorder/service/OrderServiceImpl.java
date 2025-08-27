@@ -544,6 +544,15 @@ public class OrderServiceImpl implements OrderService {
                 })
                 .collect(Collectors.toList());
 
+        // Create a list of status history DTOs
+        List<OrderDetailResponse.OrderStatusTimestampDto> historyDtos = order.getStatusHistory().stream()
+                .map(timestamp -> OrderDetailResponse.OrderStatusTimestampDto.builder()
+                        .status(timestamp.getStatus())
+                        .updatedAt(timestamp.getUpdatedAt())
+                        .build())
+                .sorted(java.util.Comparator.comparing(OrderDetailResponse.OrderStatusTimestampDto::getUpdatedAt)) // Ensure chronological order
+                .collect(java.util.stream.Collectors.toList());
+
         return OrderDetailResponse.builder()
                 .orderId(order.getOrderId())
                 .userId(order.getUserId())
@@ -566,6 +575,7 @@ public class OrderServiceImpl implements OrderService {
                                 .paidAt(order.getPayment().getPaidAt())
                                 .build() : null)
                 .createdAt(order.getCreatedAt())
+                .statusHistory(historyDtos)
                 .build();
     }
 
@@ -590,6 +600,15 @@ public class OrderServiceImpl implements OrderService {
                 })
                 .collect(Collectors.toList());
 
+        // Create a list of status history DTOs
+        List<OrderDetailResponse.OrderStatusTimestampDto> historyDtos = order.getStatusHistory().stream()
+                .map(timestamp -> OrderDetailResponse.OrderStatusTimestampDto.builder()
+                        .status(timestamp.getStatus())
+                        .updatedAt(timestamp.getUpdatedAt())
+                        .build())
+                .sorted(java.util.Comparator.comparing(OrderDetailResponse.OrderStatusTimestampDto::getUpdatedAt)) // Ensure chronological order
+                .collect(java.util.stream.Collectors.toList());
+
         return OrderDetailResponse.builder()
                 .orderId(order.getOrderId())
                 .userId(order.getUserId())
@@ -612,6 +631,7 @@ public class OrderServiceImpl implements OrderService {
                                 .paidAt(order.getPayment().getPaidAt())
                                 .build() : null)
                 .createdAt(order.getCreatedAt())
+                .statusHistory(historyDtos)
                 .build();
     }
 
