@@ -60,7 +60,7 @@ public interface StoreClient {
      * @param userId X-Auth-UserId 헤더의 사용자 ID (Store 서비스에서 필수)
      * @return 스토어 ID를 키로 하는 StoreResponseDto 맵을 포함한 ApiResponseDto
      */
-    @GetMapping("/api/store/bulk")
+    @GetMapping("/backend/store/bulk")
     ApiResponseDto<Map<Long, StoreResponseDto>> getStoresByIds(
             @RequestParam("storeIds") List<Long> storeIds,
             @RequestHeader("X-Auth-UserId") Long userId

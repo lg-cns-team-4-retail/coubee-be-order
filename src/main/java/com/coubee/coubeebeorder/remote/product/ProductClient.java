@@ -65,7 +65,7 @@ public interface ProductClient {
      * @param userId X-Auth-UserId 헤더의 사용자 ID (Product 서비스에서 필수)
      * @return 상품 ID를 키로 하는 ProductResponseDto 맵을 포함한 ApiResponseDto
      */
-    @GetMapping("/api/product/bulk")
+    @GetMapping("/backend/product/bulk")
     ApiResponseDto<Map<Long, ProductResponseDto>> getProductsByIds(
             @RequestParam("productIds") List<Long> productIds,
             @RequestHeader("X-Auth-UserId") Long userId
