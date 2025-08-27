@@ -14,7 +14,6 @@ import com.coubee.coubeebeorder.domain.dto.PaymentReadyResponse;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.domain.repository.PaymentRepository;
 import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
-import com.coubee.coubeebeorder.kafka.producer.product.event.StockDecreaseEvent;
 import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
@@ -42,6 +41,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final OrderService orderService;
+    private final ProductStockService productStockService;
     private final KafkaMessageProducer kafkaMessageProducer;
     private final PortOneWebhookVerifier webhookVerifier;
     private final ObjectMapper objectMapper;
@@ -55,6 +55,12 @@ public class PaymentServiceImpl implements PaymentService {
 
         Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다. Order ID: " + orderId));
+
+        // 재고 감소 처리 - 결제 준비 시점에 재고를 선점합니다.
+        // InsufficientStockException이 발생하면 결제 준비 과정이 중단됩니다.
+        log.info("재고 감소 처리 시작 - 주문 ID: {}", orderId);
+        productStockService.decreaseStock(order);
+        log.info("재고 감소 처리 완료 - 주문 ID: {}", orderId);
 
         paymentRepository.findByOrder_OrderId(orderId).orElseGet(() -> {
             Payment newPayment = Payment.createPayment(
@@ -179,8 +185,7 @@ public class PaymentServiceImpl implements PaymentService {
         // V3: 모든 주문 아이템의 이벤트 타입을 PURCHASE로 설정
         order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
 
-        publishStockDecreaseEvent(order);
-
+        // 재고 감소는 이미 결제 준비 시점에 처리되었으므로 여기서는 제거
         log.info("결제 성공 처리 완료: 주문 ID {}", merchantUid);
         return true;
     }
@@ -205,38 +210,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
-    private void publishStockDecreaseEvent(Order order) {
-        try {
-            // 새로운 이벤트 구조로 재고 감소 이벤트 생성
-            List<StockDecreaseEvent.StockItem> stockItems = order.getItems().stream()
-                    .map(item -> StockDecreaseEvent.StockItem.builder()
-                            .productId(item.getProductId())
-                            .quantity(item.getQuantity())
-                            .build())
-                    .toList();
 
-            StockDecreaseEvent stockDecreaseEvent = StockDecreaseEvent.create(
-                    order.getOrderId(),
-                    order.getUserId(),
-                    stockItems
-            );
-
-            kafkaMessageProducer.publishStockDecreaseEvent(stockDecreaseEvent);
-            log.info("재고 감소 이벤트 발행 완료 - 결제 완료: {}", order.getOrderId());
-
-            // 주문 완료 알림 이벤트도 발행
-            String storeName = getStoreName(order.getStoreId(), order.getUserId());
-            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createPaidNotification(
-                    order.getOrderId(),
-                    order.getUserId(),
-                    storeName
-            );
-            kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
-
-        } catch (Exception e) {
-            log.error("재고 감소 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
-        }
-    }
 
     
 
