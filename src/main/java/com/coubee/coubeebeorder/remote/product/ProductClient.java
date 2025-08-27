@@ -51,7 +51,7 @@ public interface ProductClient {
      * @param userId X-Auth-UserId 헤더의 사용자 ID (Product 서비스에서 필수)
      * @return StockUpdateResponse를 포함한 ApiResponseDto
      */
-    @PostMapping("/api/product/internal/stock/update")
+    @PostMapping("/backend/product/stock/update")
     ApiResponseDto<StockUpdateResponse> updateStock(
             @RequestBody StockUpdateRequest request,
             @RequestHeader("X-Auth-UserId") Long userId
