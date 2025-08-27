@@ -3,7 +3,7 @@ package com.coubee.coubeebeorder.service;
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.domain.Order;
 import com.coubee.coubeebeorder.domain.OrderItem;
-import com.coubee.coubeebeorder.remote.product.ProductStockClient;
+import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.product.StockUpdateRequest;
 import com.coubee.coubeebeorder.remote.product.StockUpdateResponse;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProductStockServiceImpl implements ProductStockService {
 
-    private final ProductStockClient productStockClient;
+    private final ProductClient productClient;
 
     @Override
     public void decreaseStock(Order order) {
@@ -43,7 +43,7 @@ public class ProductStockServiceImpl implements ProductStockService {
                     .build();
 
             // Product Service에 재고 감소 요청
-            ApiResponseDto<StockUpdateResponse> response = productStockClient.updateStock(request, order.getUserId());
+            ApiResponseDto<StockUpdateResponse> response = productClient.updateStock(request, order.getUserId());
 
             if (response.isSuccess() && response.getData() != null && response.getData().getSuccess()) {
                 log.info("재고 감소 성공 - 주문 ID: {}", order.getOrderId());
@@ -79,7 +79,7 @@ public class ProductStockServiceImpl implements ProductStockService {
                     .build();
 
             // Product Service에 재고 증가 요청
-            ApiResponseDto<StockUpdateResponse> response = productStockClient.updateStock(request, order.getUserId());
+            ApiResponseDto<StockUpdateResponse> response = productClient.updateStock(request, order.getUserId());
 
             if (response.isSuccess() && response.getData() != null && response.getData().getSuccess()) {
                 log.info("재고 증가 성공 - 주문 ID: {}", order.getOrderId());
