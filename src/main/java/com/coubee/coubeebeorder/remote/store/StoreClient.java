@@ -74,4 +74,13 @@ public interface StoreClient {
      */
     @GetMapping("/backend/store/{storeId}/hotdeal/active")
     ApiResponseDto<HotdealResponseDto> getActiveHotdeal(@PathVariable("storeId") Long storeId);
+
+    /**
+     * 스토어 상태 검증 (APPROVED 상태인지 확인)
+     *
+     * @param storeId 검증할 스토어의 ID
+     * @return 스토어가 APPROVED 상태이면 true, 아니면 false를 포함한 ApiResponseDto
+     */
+    @GetMapping("/backend/store/{storeId}/validate-status")
+    ApiResponseDto<Boolean> isStoreApproved(@PathVariable("storeId") Long storeId);
 }

@@ -1,8 +1,13 @@
 package com.coubee.coubeebeorder.statistic.service;
 
+import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import com.coubee.coubeebeorder.common.exception.ApiError;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
+import com.coubee.coubeebeorder.remote.store.StoreClient;
+import com.coubee.coubeebeorder.remote.user.UserClient;
 import com.coubee.coubeebeorder.statistic.dto.DailyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticDto;
+import com.coubee.coubeebeorder.statistic.dto.ProductSalesSummaryDto;
 import com.coubee.coubeebeorder.statistic.dto.WeeklyStatisticDto;
 import com.coubee.coubeebeorder.statistic.projection.*;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +32,49 @@ import java.util.stream.Collectors;
 public class StatisticServiceImpl implements StatisticService {
 
     private final OrderRepository orderRepository;
+    private final UserClient userClient;
+    private final StoreClient storeClient;
+
+    /**
+     * Validate store access for the given user
+     * Checks if the user owns the store and if the store is approved
+     */
+    private void validateStoreAccess(Long userId, Long storeId) {
+        if (storeId == null) {
+            return; // System-wide statistics don't require store validation
+        }
+
+        try {
+            // Get user's owned stores
+            ApiResponseDto<List<Long>> ownedStoresResponse = userClient.getMyOwnedStoreIds(userId);
+            List<Long> ownedStoreIds = ownedStoresResponse.getData();
+
+            if (ownedStoreIds == null || !ownedStoreIds.contains(storeId)) {
+                throw new ApiError("Access denied: You do not own this store");
+            }
+
+            // Validate store status
+            ApiResponseDto<Boolean> storeStatusResponse = storeClient.isStoreApproved(storeId);
+            Boolean isApproved = storeStatusResponse.getData();
+
+            if (isApproved == null || !isApproved) {
+                throw new ApiError("Access denied: Store is not approved");
+            }
+        } catch (Exception e) {
+            if (e instanceof ApiError) {
+                throw e;
+            }
+            log.error("Error validating store access for userId: {}, storeId: {}", userId, storeId, e);
+            throw new ApiError("Unable to validate store access");
+        }
+    }
 
     @Override
-    public DailyStatisticDto dailyStatistic(LocalDate date, Long storeId) {
-        log.info("Getting daily statistics for date: {}, storeId: {}", date, storeId);
+    public DailyStatisticDto dailyStatistic(LocalDate date, Long storeId, Long userId) {
+        log.info("Getting daily statistics for date: {}, storeId: {}, userId: {}", date, storeId, userId);
+
+        // Validate store access
+        validateStoreAccess(userId, storeId);
 
         try {
             // Convert LocalDate to UNIX timestamps for today
@@ -93,8 +137,11 @@ public class StatisticServiceImpl implements StatisticService {
     }
 
     @Override
-    public WeeklyStatisticDto weeklyStatistic(LocalDate weekStartDate, Long storeId) {
-        log.info("Getting weekly statistics for week starting: {}, storeId: {}", weekStartDate, storeId);
+    public WeeklyStatisticDto weeklyStatistic(LocalDate weekStartDate, Long storeId, Long userId) {
+        log.info("Getting weekly statistics for week starting: {}, storeId: {}, userId: {}", weekStartDate, storeId, userId);
+
+        // Validate store access
+        validateStoreAccess(userId, storeId);
 
         try {
             LocalDate weekEndDate = weekStartDate.plusDays(6);
@@ -174,8 +221,11 @@ public class StatisticServiceImpl implements StatisticService {
     }
 
     @Override
-    public MonthlyStatisticDto monthlyStatistic(int year, int month, Long storeId) {
-        log.info("Getting monthly statistics for {}-{}, storeId: {}", year, month, storeId);
+    public MonthlyStatisticDto monthlyStatistic(int year, int month, Long storeId, Long userId) {
+        log.info("Getting monthly statistics for {}-{}, storeId: {}, userId: {}", year, month, storeId, userId);
+
+        // Validate store access
+        validateStoreAccess(userId, storeId);
 
         try {
             // Calculate month start and end dates
@@ -347,5 +397,42 @@ public class StatisticServiceImpl implements StatisticService {
                 return 0L; // No sales data available
             }
         };
+    }
+
+    @Override
+    public List<ProductSalesSummaryDto> getProductSalesSummary(Long storeId, LocalDate startDate, LocalDate endDate, Long userId) {
+        log.info("Getting product sales summary for storeId: {}, startDate: {}, endDate: {}, userId: {}",
+                storeId, startDate, endDate, userId);
+
+        // Validate store access
+        validateStoreAccess(userId, storeId);
+
+        try {
+            // Convert LocalDate to UNIX timestamps
+            long startUnix = startDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
+            long endUnix = endDate.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
+
+            // Get product sales summary from repository
+            List<OrderRepository.ProductSalesSummaryProjection> projections =
+                orderRepository.findProductSalesSummaryByStore(storeId, startUnix, endUnix);
+
+            // Convert projections to DTOs
+            List<ProductSalesSummaryDto> result = projections.stream()
+                .map(projection -> ProductSalesSummaryDto.builder()
+                    .productId(projection.getProductId())
+                    .productName(projection.getProductName())
+                    .quantitySold(projection.getQuantitySold())
+                    .totalSalesAmount(projection.getTotalSalesAmount())
+                    .build())
+                .collect(Collectors.toList());
+
+            log.info("Successfully retrieved product sales summary for storeId: {}, found {} products",
+                    storeId, result.size());
+            return result;
+        } catch (Exception e) {
+            log.error("Error retrieving product sales summary for storeId: {}, startDate: {}, endDate: {}",
+                    storeId, startDate, endDate, e);
+            throw new RuntimeException("Failed to retrieve product sales summary", e);
+        }
     }
 }

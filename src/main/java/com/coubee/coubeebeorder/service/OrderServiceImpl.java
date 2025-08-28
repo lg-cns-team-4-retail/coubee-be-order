@@ -712,6 +712,7 @@ public class OrderServiceImpl implements OrderService {
         fallbackStore.setWorkingHour("영업시간 정보 없음");
         // storeTag는 List<CategoryDto>이므로 빈 리스트로 설정
         fallbackStore.setStoreTag(new ArrayList<>());
+        fallbackStore.setFallback(true);
 
         return fallbackStore;
     }
@@ -729,6 +730,7 @@ public class OrderServiceImpl implements OrderService {
         fallbackProduct.setOriginPrice(0);
         fallbackProduct.setSalePrice(0);
         fallbackProduct.setStock(0);
+        fallbackProduct.setFallback(true);
 
         return fallbackProduct;
     }
@@ -772,6 +774,7 @@ public class OrderServiceImpl implements OrderService {
         fallbackStore.setWorkingHour("영업시간 정보 없음");
         // storeTag는 List<CategoryDto>이므로 빈 리스트로 설정
         fallbackStore.setStoreTag(new ArrayList<>());
+        fallbackStore.setFallback(true);
         return fallbackStore;
     }
 
@@ -786,6 +789,7 @@ public class OrderServiceImpl implements OrderService {
         fallbackProduct.setOriginPrice(0);
         fallbackProduct.setSalePrice(0);
         fallbackProduct.setStock(0);
+        fallbackProduct.setFallback(true);
         return fallbackProduct;
     }
 

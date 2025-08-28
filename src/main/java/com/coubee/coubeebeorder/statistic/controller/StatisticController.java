@@ -3,6 +3,7 @@ package com.coubee.coubeebeorder.statistic.controller;
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.statistic.dto.DailyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticDto;
+import com.coubee.coubeebeorder.statistic.dto.ProductSalesSummaryDto;
 import com.coubee.coubeebeorder.statistic.dto.WeeklyStatisticDto;
 import com.coubee.coubeebeorder.statistic.service.StatisticService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Tag(name = "Statistic API", description = "APIs for retrieving sales statistics and reports")
 @RestController
@@ -22,62 +24,63 @@ public class StatisticController {
 
     private final StatisticService statisticService;
 
-    @Operation(summary = "Get Daily Sales Statistics", description = "Retrieves daily sales statistics for a specific date (Admin only)")
+    @Operation(summary = "Get Daily Sales Statistics", description = "Retrieves daily sales statistics for a specific date (Store Owner only)")
     @GetMapping("/sales/daily")
     public ApiResponseDto<DailyStatisticDto> getDailyStatistics(
-            @Parameter(description = "User role from authentication", hidden = true)
-            @RequestHeader("X-Auth-Role") String userRole,
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
             @Parameter(description = "Date for statistics", required = true, example = "2023-06-01")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @Parameter(description = "Store ID for filtering (optional)", required = false, example = "1")
-            @RequestParam(required = false) Long storeId) {
+            @Parameter(description = "Store ID for filtering (required)", required = true, example = "1")
+            @RequestParam Long storeId) {
 
-        // Validate user has permission to access statistics
-        if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
-            throw new IllegalArgumentException("Only admins and super admins can access sales statistics");
-        }
-
-        DailyStatisticDto response = statisticService.dailyStatistic(date, storeId);
+        DailyStatisticDto response = statisticService.dailyStatistic(date, storeId, userId);
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get Weekly Sales Statistics", description = "Retrieves weekly sales statistics for a specific week (Admin only)")
+    @Operation(summary = "Get Weekly Sales Statistics", description = "Retrieves weekly sales statistics for a specific week (Store Owner only)")
     @GetMapping("/sales/weekly")
     public ApiResponseDto<WeeklyStatisticDto> getWeeklyStatistics(
-            @Parameter(description = "User role from authentication", hidden = true)
-            @RequestHeader("X-Auth-Role") String userRole,
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
             @Parameter(description = "Week start date", required = true, example = "2023-05-29")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate,
-            @Parameter(description = "Store ID for filtering (optional)", required = false, example = "1")
-            @RequestParam(required = false) Long storeId) {
+            @Parameter(description = "Store ID for filtering (required)", required = true, example = "1")
+            @RequestParam Long storeId) {
 
-        // Validate user has permission to access statistics
-        if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
-            throw new IllegalArgumentException("Only admins and super admins can access sales statistics");
-        }
-
-        WeeklyStatisticDto response = statisticService.weeklyStatistic(weekStartDate, storeId);
+        WeeklyStatisticDto response = statisticService.weeklyStatistic(weekStartDate, storeId, userId);
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get Monthly Sales Statistics", description = "Retrieves monthly sales statistics for a specific month (Admin only)")
+    @Operation(summary = "Get Monthly Sales Statistics", description = "Retrieves monthly sales statistics for a specific month (Store Owner only)")
     @GetMapping("/sales/monthly")
     public ApiResponseDto<MonthlyStatisticDto> getMonthlyStatistics(
-            @Parameter(description = "User role from authentication", hidden = true)
-            @RequestHeader("X-Auth-Role") String userRole,
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
             @Parameter(description = "Year", required = true, example = "2023")
             @RequestParam int year,
             @Parameter(description = "Month (1-12)", required = true, example = "6")
             @RequestParam int month,
-            @Parameter(description = "Store ID for filtering (optional)", required = false, example = "1")
-            @RequestParam(required = false) Long storeId) {
+            @Parameter(description = "Store ID for filtering (required)", required = true, example = "1")
+            @RequestParam Long storeId) {
 
-        // Validate user has permission to access statistics
-        if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
-            throw new IllegalArgumentException("Only admins and super admins can access sales statistics");
-        }
+        MonthlyStatisticDto response = statisticService.monthlyStatistic(year, month, storeId, userId);
+        return ApiResponseDto.readOk(response);
+    }
 
-        MonthlyStatisticDto response = statisticService.monthlyStatistic(year, month, storeId);
+    @Operation(summary = "Get Product Sales Summary", description = "Retrieves product sales summary for a store within a date range (Store Owner only)")
+    @GetMapping("/product-sales-summary")
+    public ApiResponseDto<List<ProductSalesSummaryDto>> getProductSalesSummary(
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
+            @Parameter(description = "Store ID", required = true, example = "1")
+            @RequestParam Long storeId,
+            @Parameter(description = "Start date (YYYY-MM-DD)", required = true, example = "2023-06-01")
+            @RequestParam LocalDate startDate,
+            @Parameter(description = "End date (YYYY-MM-DD)", required = true, example = "2023-06-30")
+            @RequestParam LocalDate endDate) {
+
+        List<ProductSalesSummaryDto> response = statisticService.getProductSalesSummary(storeId, startDate, endDate, userId);
         return ApiResponseDto.readOk(response);
     }
 }

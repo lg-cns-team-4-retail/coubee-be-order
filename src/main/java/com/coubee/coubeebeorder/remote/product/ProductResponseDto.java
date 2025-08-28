@@ -21,6 +21,9 @@ public class ProductResponseDto {
     private int salePrice;
     
     private int stock;
-    
+
     private Long storeId;
+
+    // Fallback flag to indicate if this data is from fallback mechanism
+    private boolean fallback = false;
 }

@@ -253,6 +253,37 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                                        @Param("storeId") Long storeId);
 
     // ========================================
+    // Product Sales Summary Query Methods
+    // ========================================
+
+    /**
+     * Projection interface for product sales summary
+     */
+    interface ProductSalesSummaryProjection {
+        Long getProductId();
+        String getProductName();
+        Integer getQuantitySold();
+        Long getTotalSalesAmount();
+    }
+
+    /**
+     * Get product sales summary for a store within a date range
+     * Returns products ordered by quantity sold (descending)
+     *
+     * @param storeId store ID to filter by
+     * @param startUnix start timestamp (UNIX)
+     * @param endUnix end timestamp (UNIX)
+     * @return list of product sales summary projections
+     */
+    @Query(value = "SELECT oi.product_id as productId, oi.product_name as productName, " +
+                   "SUM(oi.quantity) as quantitySold, SUM(oi.quantity * oi.price) as totalSalesAmount " +
+                   "FROM order_items oi JOIN orders o ON oi.order_id = o.order_id " +
+                   "WHERE o.store_id = :storeId AND o.status = 'RECEIVED' AND o.paid_at_unix BETWEEN :startUnix AND :endUnix " +
+                   "GROUP BY oi.product_id, oi.product_name ORDER BY quantitySold DESC", nativeQuery = true)
+    List<ProductSalesSummaryProjection> findProductSalesSummaryByStore(
+        @Param("storeId") Long storeId, @Param("startUnix") Long startUnix, @Param("endUnix") Long endUnix);
+
+    // ========================================
     // User Order Summary Query Methods
     // ========================================
 
