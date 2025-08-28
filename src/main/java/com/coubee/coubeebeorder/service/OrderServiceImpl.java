@@ -594,8 +594,6 @@ public class OrderServiceImpl implements OrderService {
                 .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .recipientName(order.getRecipientName())
-                .orderToken(order.getOrderToken())
-                .orderQR(order.getOrderQR())
                 .paidAtUnix(order.getPaidAtUnix())
                 .items(itemResponses)
                 .payment(order.getPayment() != null ?
@@ -652,8 +650,6 @@ public class OrderServiceImpl implements OrderService {
                 .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .recipientName(order.getRecipientName())
-                .orderToken(order.getOrderToken())
-                .orderQR(order.getOrderQR())
                 .paidAtUnix(order.getPaidAtUnix())
                 .items(itemResponses)
                 .payment(order.getPayment() != null ?

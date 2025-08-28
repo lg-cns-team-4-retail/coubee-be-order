@@ -46,11 +46,7 @@ public class Order extends BaseTimeEntity {
     @Column(name = "recipient_name", nullable = false)
     private String recipientName;
 
-    @Column(name = "order_token")
-    private String orderToken;
 
-    @Column(name = "order_qr", columnDefinition = "TEXT")
-    private String orderQR;
 
     @Column(name = "paid_at_unix")
     private Long paidAtUnix;
@@ -65,7 +61,7 @@ public class Order extends BaseTimeEntity {
     private List<OrderTimestamp> statusHistory = new ArrayList<>();
 
     @Builder
-    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName, String orderToken, String orderQR, Long paidAtUnix) {
+    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName, Long paidAtUnix) {
         this.orderId = orderId;
         this.userId = userId;
         this.storeId = storeId;
@@ -74,8 +70,6 @@ public class Order extends BaseTimeEntity {
         this.discountAmount = discountAmount != null ? discountAmount : 0;
         this.totalAmount = totalAmount;
         this.recipientName = recipientName;
-        this.orderToken = orderToken;
-        this.orderQR = orderQR;
         this.paidAtUnix = paidAtUnix;
     }
 
@@ -110,16 +104,8 @@ public class Order extends BaseTimeEntity {
         statusHistory.add(timestamp);
     }
 
-    public void setOrderToken(String orderToken) {
-        this.orderToken = orderToken;
-    }
-
     public void setPayment(Payment payment) {
         this.payment = payment;
-    }
-
-    public void setOrderQR(String orderQR) {
-        this.orderQR = orderQR;
     }
 
     /**

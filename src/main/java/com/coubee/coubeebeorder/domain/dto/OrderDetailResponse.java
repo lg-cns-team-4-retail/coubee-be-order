@@ -42,11 +42,7 @@ public class OrderDetailResponse {
     @Schema(description = "Recipient name", example = "홍길동")
     private String recipientName;
 
-    @Schema(description = "Order token (QR/barcode)", example = "abcdef123456")
-    private String orderToken;
 
-    @Schema(description = "Order QR code (Base64)", example = "b3JkZXJfYjc4MzM2ODZmMjViNDhlMDg2MjYxMjM0NTY3OGFiY2Q=")
-    private String orderQR;
 
     @Schema(description = "Order creation time", example = "2023-06-01T14:30:00")
     private LocalDateTime createdAt;
