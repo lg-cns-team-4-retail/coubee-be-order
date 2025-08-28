@@ -34,7 +34,7 @@ public class OrderItem extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer price;
 
-    @Enumerated(EnumType.STRING)
+    // @Enumerated(EnumType.STRING) // This annotation has been removed.
     @Column(name = "event_type")
     private EventType eventType;
 

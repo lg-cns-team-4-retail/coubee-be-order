@@ -26,7 +26,6 @@ import java.util.Map;
  */
 @FeignClient(
     name = "coubee-be-product-service",
-    url = "http://coubee-be-product-service:8080",
     configuration = com.coubee.coubeebeorder.config.FeignConfig.class
 )
 public interface ProductClient {
