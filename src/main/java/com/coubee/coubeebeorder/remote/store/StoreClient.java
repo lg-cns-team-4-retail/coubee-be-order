@@ -1,6 +1,7 @@
 package com.coubee.coubeebeorder.remote.store;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import com.coubee.coubeebeorder.remote.hotdeal.HotdealResponseDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -64,4 +65,13 @@ public interface StoreClient {
             @RequestParam("storeIds") List<Long> storeIds,
             @RequestHeader("X-Auth-UserId") Long userId
     );
+
+    /**
+     * 스토어의 활성 핫딜 정보 조회
+     *
+     * @param storeId 조회할 스토어의 ID
+     * @return HotdealResponseDto를 포함한 ApiResponseDto (핫딜이 없으면 data는 null)
+     */
+    @GetMapping("/backend/store/{storeId}/hotdeal/active")
+    ApiResponseDto<HotdealResponseDto> getActiveHotdeal(@PathVariable("storeId") Long storeId);
 }

@@ -34,6 +34,12 @@ public class Order extends BaseTimeEntity {
     @Column(nullable = false)
     private OrderStatus status;
 
+    @Column(name = "original_amount", nullable = false)
+    private Integer originalAmount;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Integer discountAmount;
+
     @Column(name = "total_amount", nullable = false)
     private Integer totalAmount;
 
@@ -59,11 +65,13 @@ public class Order extends BaseTimeEntity {
     private List<OrderTimestamp> statusHistory = new ArrayList<>();
 
     @Builder
-    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer totalAmount, String recipientName, String orderToken, String orderQR, Long paidAtUnix) {
+    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName, String orderToken, String orderQR, Long paidAtUnix) {
         this.orderId = orderId;
         this.userId = userId;
         this.storeId = storeId;
         this.status = status;
+        this.originalAmount = originalAmount;
+        this.discountAmount = discountAmount != null ? discountAmount : 0;
         this.totalAmount = totalAmount;
         this.recipientName = recipientName;
         this.orderToken = orderToken;
@@ -71,15 +79,22 @@ public class Order extends BaseTimeEntity {
         this.paidAtUnix = paidAtUnix;
     }
 
-    public static Order createOrder(String orderId, Long userId, Long storeId, Integer totalAmount, String recipientName) {
+    public static Order createOrder(String orderId, Long userId, Long storeId, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName) {
         return Order.builder()
                 .orderId(orderId)
                 .userId(userId)
                 .storeId(storeId)
                 .status(OrderStatus.PENDING)
+                .originalAmount(originalAmount)
+                .discountAmount(discountAmount)
                 .totalAmount(totalAmount)
                 .recipientName(recipientName)
                 .build();
+    }
+
+    // Backward compatibility method for existing code
+    public static Order createOrder(String orderId, Long userId, Long storeId, Integer totalAmount, String recipientName) {
+        return createOrder(orderId, userId, storeId, totalAmount, 0, totalAmount, recipientName);
     }
 
     public void addOrderItem(OrderItem item) {

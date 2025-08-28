@@ -30,7 +30,13 @@ public class OrderDetailResponse {
     @Schema(description = "Order status", example = "PAID")
     private OrderStatus status;
 
-    @Schema(description = "Total order amount", example = "200")
+    @Schema(description = "Original order amount (before discount)", example = "30000")
+    private Integer originalAmount;
+
+    @Schema(description = "Discount amount applied", example = "5000")
+    private Integer discountAmount;
+
+    @Schema(description = "Total order amount (after discount)", example = "200")
     private Integer totalAmount;
 
     @Schema(description = "Recipient name", example = "홍길동")

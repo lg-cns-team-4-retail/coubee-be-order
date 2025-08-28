@@ -13,6 +13,7 @@ import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificat
 import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
 import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
+import com.coubee.coubeebeorder.remote.hotdeal.HotdealResponseDto;
 // import io.portone.sdk.server.payment.CancelPaymentRequest; // Not available in current SDK version
 import io.portone.sdk.server.payment.PaymentClient;
 import feign.FeignException;
@@ -56,8 +57,8 @@ public class OrderServiceImpl implements OrderService {
 
         String orderId = "order_" + UUID.randomUUID().toString().replace("-", "");
 
-        // First, fetch all product information and calculate total amount
-        int totalAmount = 0;
+        // First, fetch all product information and calculate original amount
+        int originalAmount = 0;
         List<ProductResponseDto> productDetails = new ArrayList<>();
 
         for (OrderCreateRequest.OrderItemRequest itemRequest : request.getItems()) {
@@ -81,7 +82,7 @@ public class OrderServiceImpl implements OrderService {
 
                 // Use salePrice for calculations
                 int itemTotalPrice = product.getSalePrice() * itemRequest.getQuantity();
-                totalAmount += itemTotalPrice;
+                originalAmount += itemTotalPrice;
 
                 productDetails.add(product);
 
@@ -99,9 +100,38 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Create order with the calculated total amount
+        // Check for active hotdeal and calculate discount
+        int discountAmount = 0;
+        int finalAmount = originalAmount;
+
+        try {
+            log.debug("Checking for active hotdeal for storeId: {}", request.getStoreId());
+            ApiResponseDto<HotdealResponseDto> hotdealResponse = storeClient.getActiveHotdeal(request.getStoreId());
+
+            if (hotdealResponse != null && hotdealResponse.getData() != null) {
+                HotdealResponseDto hotdeal = hotdealResponse.getData();
+                log.info("Active hotdeal found for storeId: {}, saleRate: {}, maxDiscount: {}",
+                        request.getStoreId(), hotdeal.getSaleRate(), hotdeal.getMaxDiscount());
+
+                // Calculate discount amount
+                double calculatedDiscount = originalAmount * hotdeal.getSaleRate();
+                discountAmount = (int) Math.min(calculatedDiscount, hotdeal.getMaxDiscount());
+                finalAmount = originalAmount - discountAmount;
+
+                log.info("Hotdeal applied: originalAmount={}, discountAmount={}, finalAmount={}",
+                        originalAmount, discountAmount, finalAmount);
+            } else {
+                log.debug("No active hotdeal found for storeId: {}", request.getStoreId());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch hotdeal information for storeId: {}, proceeding without discount. Error: {}",
+                    request.getStoreId(), e.getMessage());
+            // Continue without discount if hotdeal service fails
+        }
+
+        // Create order with original amount, discount amount, and final amount
         Order order = Order.createOrder(
-                orderId, userId, request.getStoreId(), totalAmount, request.getRecipientName());
+                orderId, userId, request.getStoreId(), originalAmount, discountAmount, finalAmount, request.getRecipientName());
 
         // Add order items with real product data
         for (int i = 0; i < request.getItems().size(); i++) {
@@ -123,12 +153,13 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.save(order);
 
-        log.info("Order created successfully: orderId={}, totalAmount={}", orderId, totalAmount);
+        log.info("Order created successfully: orderId={}, originalAmount={}, discountAmount={}, finalAmount={}",
+                orderId, originalAmount, discountAmount, finalAmount);
 
         return OrderCreateResponse.builder()
                 .orderId(orderId)
                 .paymentId(orderId)
-                .amount(totalAmount)
+                .amount(finalAmount)
                 .orderName(generateOrderName(order.getItems()))
                 .buyerName(request.getRecipientName())
                 .build();
@@ -559,6 +590,8 @@ public class OrderServiceImpl implements OrderService {
                 .storeId(order.getStoreId())
                 .store(storeDetails)
                 .status(order.getStatus())
+                .originalAmount(order.getOriginalAmount())
+                .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .recipientName(order.getRecipientName())
                 .orderToken(order.getOrderToken())
@@ -615,6 +648,8 @@ public class OrderServiceImpl implements OrderService {
                 .storeId(order.getStoreId())
                 .store(storeDetails) // Full store details
                 .status(order.getStatus())
+                .originalAmount(order.getOriginalAmount())
+                .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .recipientName(order.getRecipientName())
                 .orderToken(order.getOrderToken())
