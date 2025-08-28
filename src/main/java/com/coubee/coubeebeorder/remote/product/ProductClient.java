@@ -1,7 +1,6 @@
 package com.coubee.coubeebeorder.remote.product;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
-import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,7 +47,7 @@ public interface ProductClient {
      * @return StockUpdateResponse를 포함한 ApiResponseDto
      */
     @PostMapping("/backend/product/stock/update")
-    ApiResponseDto<StockUpdateResponse> updateStock(
+    ApiResponseDto<String> updateStock(
             @RequestBody StockUpdateRequest request,
             @RequestHeader("X-Auth-UserId") Long userId
     );

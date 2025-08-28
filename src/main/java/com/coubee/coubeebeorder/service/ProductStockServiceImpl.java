@@ -5,7 +5,6 @@ import com.coubee.coubeebeorder.domain.Order;
 import com.coubee.coubeebeorder.domain.OrderItem;
 import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.product.StockUpdateRequest;
-import com.coubee.coubeebeorder.remote.product.StockUpdateResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,11 +28,10 @@ public class ProductStockServiceImpl implements ProductStockService {
         log.info("재고 감소 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
 
         try {
-            // 주문 아이템들을 재고 감소 요청으로 변환 (음수로 설정)
             List<StockUpdateRequest.StockItem> stockItems = order.getItems().stream()
                     .map(item -> StockUpdateRequest.StockItem.builder()
                             .productId(item.getProductId())
-                            .quantityChange(-item.getQuantity()) // 음수로 설정하여 재고 감소
+                            .quantityChange(-item.getQuantity())
                             .build())
                     .collect(Collectors.toList());
 
@@ -42,21 +40,24 @@ public class ProductStockServiceImpl implements ProductStockService {
                     .items(stockItems)
                     .build();
 
-            // Product Service에 재고 감소 요청
-            ApiResponseDto<StockUpdateResponse> response = productClient.updateStock(request, order.getUserId());
+            // 1. 반환 타입을 ApiResponseDto<String>으로 변경합니다.
+            ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            if (response.isSuccess() && response.getData() != null && response.getData().getSuccess()) {
+            // 2. product-service의 ApiResponseDto에 success 필드가 없으므로, code 값으로 성공 여부를 판단합니다.
+            if ("OK".equals(response.getCode())) {
                 log.info("재고 감소 성공 - 주문 ID: {}", order.getOrderId());
-                logStockUpdateDetails(response.getData(), "감소");
+                // 3. 응답 데이터(data)가 String이므로 상세 로깅은 제거하거나 단순화합니다.
+                // logStockUpdateDetails(response.getData(), "감소"); // 이 라인은 제거해야 합니다.
             } else {
-                log.error("재고 감소 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
-                throw new RuntimeException("재고 감소에 실패했습니다: " + 
-                    (response.getData() != null ? response.getData().getMessage() : "알 수 없는 오류"));
+                log.error("재고 감소 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
+                        order.getOrderId(), response.getCode(), response.getMessage());
+                // 4. 에러 메시지를 응답에서 가져와서 던집니다.
+                throw new RuntimeException("재고 감소에 실패했습니다: " + response.getMessage());
             }
 
         } catch (Exception e) {
             log.error("재고 감소 중 오류 발생 - 주문 ID: {}", order.getOrderId(), e);
-            throw e; // InsufficientStockException이나 다른 예외를 그대로 전파
+            throw e; 
         }
     }
 
@@ -65,11 +66,10 @@ public class ProductStockServiceImpl implements ProductStockService {
         log.info("재고 증가 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
 
         try {
-            // 주문 아이템들을 재고 증가 요청으로 변환 (양수로 설정)
             List<StockUpdateRequest.StockItem> stockItems = order.getItems().stream()
                     .map(item -> StockUpdateRequest.StockItem.builder()
                             .productId(item.getProductId())
-                            .quantityChange(item.getQuantity()) // 양수로 설정하여 재고 증가
+                            .quantityChange(item.getQuantity())
                             .build())
                     .collect(Collectors.toList());
 
@@ -78,35 +78,20 @@ public class ProductStockServiceImpl implements ProductStockService {
                     .items(stockItems)
                     .build();
 
-            // Product Service에 재고 증가 요청
-            ApiResponseDto<StockUpdateResponse> response = productClient.updateStock(request, order.getUserId());
+            ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            if (response.isSuccess() && response.getData() != null && response.getData().getSuccess()) {
+            if ("OK".equals(response.getCode())) {
                 log.info("재고 증가 성공 - 주문 ID: {}", order.getOrderId());
-                logStockUpdateDetails(response.getData(), "증가");
             } else {
-                log.error("재고 증가 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
-                // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
+                log.error("재고 증가 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
+                        order.getOrderId(), response.getCode(), response.getMessage());
                 log.warn("재고 증가 실패는 보상 트랜잭션이므로 처리를 계속합니다.");
             }
 
         } catch (Exception e) {
             log.error("재고 증가 중 오류 발생 - 주문 ID: {}", order.getOrderId(), e);
-            // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
             log.warn("재고 증가 실패는 보상 트랜잭션이므로 처리를 계속합니다.");
         }
     }
 
-    /**
-     * 재고 업데이트 결과를 상세히 로깅합니다.
-     */
-    private void logStockUpdateDetails(StockUpdateResponse response, String operation) {
-        if (response.getUpdatedItems() != null) {
-            for (StockUpdateResponse.UpdatedStockItem item : response.getUpdatedItems()) {
-                log.info("재고 {} 상세 - 상품 ID: {}, 이전 재고: {}, 현재 재고: {}, 변경량: {}", 
-                    operation, item.getProductId(), item.getPreviousStock(), 
-                    item.getCurrentStock(), item.getQuantityChange());
-            }
-        }
-    }
 }
