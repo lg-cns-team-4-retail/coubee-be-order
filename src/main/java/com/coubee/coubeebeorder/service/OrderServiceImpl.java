@@ -423,6 +423,10 @@ public class OrderServiceImpl implements OrderService {
                         order.getOrderId(), cancelStatus, storeName);
             }
         } catch (Exception e) {
+            log.error("주문 취소 알림 이벤트 발행 실패 - 주문: {}, 상태: {}", 
+                    order.getOrderId(), cancelStatus, e);
+        }
+    }
 
     private String getStoreName(Long storeId, Long userId) {
         try {
