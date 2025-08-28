@@ -236,6 +236,49 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    /**
+     * Implements the logic for creating and completing a test order.
+     */
+    @Override
+    @Transactional
+    public String createAndCompleteTestOrder(Long userId, Long storeId) {
+        log.info("Creating and force-completing test order for userId: {}, storeId: {}", userId, storeId);
+
+        // 1. Create test Order and OrderItem data
+        String orderId = "test_order_" + UUID.randomUUID().toString().replace("-", "");
+        int totalAmount = 15000; // Example amount
+        String recipientName = "Test User";
+
+        Order order = Order.createOrder(orderId, userId, storeId, totalAmount, recipientName);
+        OrderItem item = OrderItem.createOrderItem(99L, "Test Product", 1, totalAmount);
+        order.addOrderItem(item);
+
+        // 2. Create test Payment data
+        Payment payment = Payment.createPayment(orderId, order, "CARD", totalAmount);
+        order.setPayment(payment);
+
+        // 3. Forcefully update status to PAID
+        order.updateStatus(OrderStatus.PAID);
+        order.markAsPaidNow(); // Set paid_at_unix timestamp
+        order.getItems().forEach(orderItem -> orderItem.updateEventType(EventType.PURCHASE));
+
+        payment.updateStatus(PaymentStatus.PAID);
+        payment.updatePaidStatus("test-pg", "test-pg-tid-" + orderId, "http://test.receipt.url");
+
+        // This is crucial for recording the OrderTimestamp history
+        orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
+
+        // 4. Save everything to the database
+        // The Order entity has CascadeType.ALL, so this saves Order, OrderItem, Payment, and OrderTimestamp
+        orderRepository.save(order);
+        log.info("Test order saved to database with orderId: {}", orderId);
+
+        // 5. Publish the Kafka event
+        publishPaymentCompletedEvent(order, payment);
+
+        return orderId;
+    }
+
     private void cancelMismatchedPayment(String transactionId, String merchantUid) {
         try {
             log.warn("결제 금액 불일치로 인한 자동 취소 필요. SDK 기능 제약으로 로깅만 수행. Transaction ID: {}, Merchant UID: {}",

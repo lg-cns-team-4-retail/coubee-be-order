@@ -80,30 +80,30 @@ public class PaymentController {
             @RequestParam Long userId,
             @Parameter(description = "매장 ID", example = "1")
             @RequestParam Long storeId) {
-        
-        log.info("결제 완료 이벤트 테스트 요청 - 사용자 ID: {}, 매장 ID: {}", userId, storeId);
-        
+
+        log.info("Payment completed event test requested - User ID: {}, Store ID: {}", userId, storeId);
+
         try {
-            // 테스트용 주문 ID 생성
-            String testOrderId = "test_order_" + System.currentTimeMillis();
-            
-            // 테스트 결과 정보
+            // Create and complete test order using the new service method
+            String testOrderId = paymentService.createAndCompleteTestOrder(userId, storeId);
+
+            // Update the response message
             Map<String, Object> result = Map.of(
                 "orderId", testOrderId,
                 "userId", userId,
                 "storeId", storeId,
-                "message", "결제 완료 알림 이벤트가 발행되었습니다.",
+                "message", "Test order created and payment completion event has been published.",
                 "timestamp", java.time.LocalDateTime.now().toString()
             );
-            
-            log.info("결제 완료 이벤트 테스트 완료 - 주문 ID: {}", testOrderId);
-            
+
+            log.info("Payment completed event test finished - Created Order ID: {}", testOrderId);
+
             return ResponseEntity.ok(ApiResponseDto.createOk(result));
-            
+
         } catch (Exception e) {
-            log.error("결제 완료 이벤트 테스트 실패", e);
+            log.error("Payment completed event test failed", e);
             return ResponseEntity.internalServerError()
-                    .body(ApiResponseDto.createError("TEST_ERROR", "테스트 실행 중 오류가 발생했습니다: " + e.getMessage(), null));
+                    .body(ApiResponseDto.createError("TEST_ERROR", "An error occurred during the test: " + e.getMessage(), null));
         }
     }
 }

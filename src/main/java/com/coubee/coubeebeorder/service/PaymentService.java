@@ -16,4 +16,13 @@ public interface PaymentService {
 
     // ✅✅✅ 반환 타입을 SDK의 DTO로 변경합니다. ✅✅✅
     Object verifyPayment(String paymentId);
+
+    /**
+     * Creates a test order, marks it as completed, and publishes a Kafka event.
+     *
+     * @param userId The ID of the user for whom to create the test order.
+     * @param storeId The ID of the store for the test order.
+     * @return The orderId of the newly created test order.
+     */
+    String createAndCompleteTestOrder(Long userId, Long storeId);
 }
