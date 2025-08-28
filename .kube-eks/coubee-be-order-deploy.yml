@@ -30,8 +30,12 @@ spec:
             # ======================================================================
             - name: SPRING_CONFIG_LOCATION
               value: file:/etc/config/application-stg.yml,file:/etc/secret/application-secret.yml
-            # ======================================================================
-            # The Kubernetes-disabling environment variables have been removed.
+            - name: SPRING_CLOUD_KUBERNETES_ENABLED
+              value: "false"
+            - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED
+              value: "false"
+            - name: SPRING_CLOUD_KUBERNETES_CONFIG_ENABLED
+              value: "false"
           ports:
             - containerPort: 8080
           volumeMounts:

@@ -26,6 +26,7 @@ import java.util.Map;
  */
 @FeignClient(
     name = "coubee-be-product-service",
+    url = "http://coubee-be-product-service:8080",
     configuration = com.coubee.coubeebeorder.config.FeignConfig.class
 )
 public interface ProductClient {
@@ -48,10 +49,10 @@ public interface ProductClient {
      *
      * @param request 재고 업데이트 요청 정보 (storeId와 상품별 변경량 포함)
      * @param userId X-Auth-UserId 헤더의 사용자 ID (Product 서비스에서 필수)
-     * @return StockUpdateResponse를 포함한 ApiResponseDto
+     * @return 업데이트 결과 메시지를 포함한 ApiResponseDto
      */
     @PostMapping("/backend/product/stock/update")
-    ApiResponseDto<StockUpdateResponse> updateStock(
+    ApiResponseDto<String> updateStock(
             @RequestBody StockUpdateRequest request,
             @RequestHeader("X-Auth-UserId") Long userId
     );

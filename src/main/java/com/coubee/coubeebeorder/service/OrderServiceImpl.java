@@ -102,10 +102,12 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Check for active hotdeal and calculate discount
+        // Hotdeal logic temporarily disabled for production compatibility
+        // The hotdeal API is not yet available in the production main branch
         int discountAmount = 0;
         int finalAmount = originalAmount;
 
+        /*
         try {
             log.debug("Checking for active hotdeal for storeId: {}", request.getStoreId());
             ApiResponseDto<HotdealResponseDto> hotdealResponse = storeClient.getActiveHotdeal(request.getStoreId());
@@ -130,6 +132,7 @@ public class OrderServiceImpl implements OrderService {
                     request.getStoreId(), e.getMessage());
             // Continue without discount if hotdeal service fails
         }
+        */
 
         // Create order with original amount, discount amount, and final amount
         Order order = Order.createOrder(
@@ -487,37 +490,24 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * 주문 목록을 벌크 API 호출을 사용하여 OrderDetailResponse 목록으로 변환
-     * N+1 문제를 해결하기 위해 모든 필요한 데이터를 한 번에 조회합니다.
+     * 주문 목록을 OrderDetailResponse 목록으로 변환
+     * Production compatibility: 개별 API 호출 방식으로 복원 (bulk API 미지원)
      */
     private List<OrderDetailResponse> convertToOrderDetailResponseList(List<Order> orders) {
         if (orders.isEmpty()) {
             return new ArrayList<>();
         }
 
-        // 1. 모든 고유한 storeId와 productId 수집
-        Set<Long> storeIds = orders.stream()
-                .map(Order::getStoreId)
-                .collect(Collectors.toSet());
-
-        Set<Long> productIds = orders.stream()
-                .flatMap(order -> order.getItems().stream())
-                .map(OrderItem::getProductId)
-                .collect(Collectors.toSet());
-
-        // 2. 벌크 API 호출로 모든 데이터를 한 번에 조회
-        Map<Long, StoreResponseDto> storeMap = getBulkStoreData(storeIds, orders.get(0).getUserId());
-        Map<Long, ProductResponseDto> productMap = getBulkProductData(productIds, orders.get(0).getUserId());
-
-        // 3. 조회된 데이터를 사용하여 OrderDetailResponse 목록 생성
+        // Individual API calls for production compatibility
         return orders.stream()
-                .map(order -> convertToOrderDetailResponseWithMaps(order, storeMap, productMap))
+                .map(this::convertToOrderDetailResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 벌크 스토어 데이터 조회 (Circuit Breaker 적용)
-     */
+    // Bulk API methods commented out for production compatibility
+    // These APIs are not yet available in the production main branch
+
+    /*
     @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getBulkStoreDataFallback")
     private Map<Long, StoreResponseDto> getBulkStoreData(Set<Long> storeIds, Long userId) {
         if (storeIds.isEmpty()) {
@@ -529,9 +519,6 @@ public class OrderServiceImpl implements OrderService {
         return response.getData() != null ? response.getData() : Map.of();
     }
 
-    /**
-     * 벌크 상품 데이터 조회 (Circuit Breaker 적용)
-     */
     @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getBulkProductDataFallback")
     private Map<Long, ProductResponseDto> getBulkProductData(Set<Long> productIds, Long userId) {
         if (productIds.isEmpty()) {
@@ -542,10 +529,10 @@ public class OrderServiceImpl implements OrderService {
         ApiResponseDto<Map<Long, ProductResponseDto>> response = productClient.getProductsByIds(productIdList, userId);
         return response.getData() != null ? response.getData() : Map.of();
     }
+    */
 
-    /**
-     * 미리 조회된 맵 데이터를 사용하여 OrderDetailResponse 생성
-     */
+    // Bulk optimization method commented out for production compatibility
+    /*
     private OrderDetailResponse convertToOrderDetailResponseWithMaps(Order order,
                                                                      Map<Long, StoreResponseDto> storeMap,
                                                                      Map<Long, ProductResponseDto> productMap) {
@@ -611,6 +598,7 @@ public class OrderServiceImpl implements OrderService {
                 .statusHistory(historyDtos)
                 .build();
     }
+    */
 
     private OrderDetailResponse convertToOrderDetailResponse(Order order) {
         // Fetch store details with circuit breaker
@@ -710,8 +698,6 @@ public class OrderServiceImpl implements OrderService {
         fallbackStore.setStoreAddress("주소 정보 없음");
         fallbackStore.setContactNo("연락처 정보 없음");
         fallbackStore.setWorkingHour("영업시간 정보 없음");
-        // storeTag는 List<CategoryDto>이므로 빈 리스트로 설정
-        fallbackStore.setStoreTag(new ArrayList<>());
         fallbackStore.setFallback(true);
 
         return fallbackStore;
@@ -735,9 +721,8 @@ public class OrderServiceImpl implements OrderService {
         return fallbackProduct;
     }
 
-    /**
-     * 벌크 스토어 데이터 조회 폴백 메서드
-     */
+    // Bulk fallback methods commented out for production compatibility
+    /*
     private Map<Long, StoreResponseDto> getBulkStoreDataFallback(Set<Long> storeIds, Long userId, Exception ex) {
         log.warn("Circuit breaker activated for bulk store data - Store IDs: {}, User ID: {}. Using fallback data.", storeIds, userId, ex);
 
@@ -748,9 +733,6 @@ public class OrderServiceImpl implements OrderService {
                 ));
     }
 
-    /**
-     * 벌크 상품 데이터 조회 폴백 메서드
-     */
     private Map<Long, ProductResponseDto> getBulkProductDataFallback(Set<Long> productIds, Long userId, Exception ex) {
         log.warn("Circuit breaker activated for bulk product data - Product IDs: {}, User ID: {}. Using fallback data.", productIds, userId, ex);
 
@@ -760,6 +742,7 @@ public class OrderServiceImpl implements OrderService {
                         this::createFallbackProductData
                 ));
     }
+    */
 
     /**
      * 폴백 스토어 데이터 생성
@@ -772,8 +755,6 @@ public class OrderServiceImpl implements OrderService {
         fallbackStore.setStoreAddress("주소 정보 없음");
         fallbackStore.setContactNo("연락처 정보 없음");
         fallbackStore.setWorkingHour("영업시간 정보 없음");
-        // storeTag는 List<CategoryDto>이므로 빈 리스트로 설정
-        fallbackStore.setStoreTag(new ArrayList<>());
         fallbackStore.setFallback(true);
         return fallbackStore;
     }

@@ -22,6 +22,7 @@ import java.util.Map;
  */
 @FeignClient(
     name = "coubee-be-store-service",
+    url = "http://coubee-be-store-service:8080",
     configuration = com.coubee.coubeebeorder.config.FeignConfig.class
 )
 public interface StoreClient {
@@ -52,35 +53,20 @@ public interface StoreClient {
             @RequestHeader("X-Auth-UserId") Long userId
     );
 
-    /**
-     * 여러 스토어 ID로 스토어 상세 정보 일괄 조회
-     * N+1 문제 해결을 위한 벌크 조회 API
-     *
-     * @param storeIds 조회할 스토어 ID 목록
-     * @param userId X-Auth-UserId 헤더의 사용자 ID (Store 서비스에서 필수)
-     * @return 스토어 ID를 키로 하는 StoreResponseDto 맵을 포함한 ApiResponseDto
-     */
+    // Advanced methods commented out for production compatibility
+    // These APIs are not yet available in the production main branch
+
+    /*
     @GetMapping("/backend/store/bulk")
     ApiResponseDto<Map<Long, StoreResponseDto>> getStoresByIds(
             @RequestParam("storeIds") List<Long> storeIds,
             @RequestHeader("X-Auth-UserId") Long userId
     );
 
-    /**
-     * 스토어의 활성 핫딜 정보 조회
-     *
-     * @param storeId 조회할 스토어의 ID
-     * @return HotdealResponseDto를 포함한 ApiResponseDto (핫딜이 없으면 data는 null)
-     */
     @GetMapping("/backend/store/{storeId}/hotdeal/active")
     ApiResponseDto<HotdealResponseDto> getActiveHotdeal(@PathVariable("storeId") Long storeId);
 
-    /**
-     * 스토어 상태 검증 (APPROVED 상태인지 확인)
-     *
-     * @param storeId 검증할 스토어의 ID
-     * @return 스토어가 APPROVED 상태이면 true, 아니면 false를 포함한 ApiResponseDto
-     */
     @GetMapping("/backend/store/{storeId}/validate-status")
     ApiResponseDto<Boolean> isStoreApproved(@PathVariable("storeId") Long storeId);
+    */
 }

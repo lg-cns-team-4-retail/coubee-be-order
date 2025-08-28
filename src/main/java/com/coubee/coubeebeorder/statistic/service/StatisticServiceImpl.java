@@ -53,13 +53,16 @@ public class StatisticServiceImpl implements StatisticService {
                 throw new ApiError("Access denied: You do not own this store");
             }
 
-            // Validate store status
+            // Store status validation temporarily disabled for production compatibility
+            // The isStoreApproved API is not yet available in the production main branch
+            /*
             ApiResponseDto<Boolean> storeStatusResponse = storeClient.isStoreApproved(storeId);
             Boolean isApproved = storeStatusResponse.getData();
 
             if (isApproved == null || !isApproved) {
                 throw new ApiError("Access denied: Store is not approved");
             }
+            */
         } catch (Exception e) {
             if (e instanceof ApiError) {
                 throw e;

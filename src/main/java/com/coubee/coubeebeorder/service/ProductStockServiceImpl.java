@@ -46,15 +46,14 @@ public class ProductStockServiceImpl implements ProductStockService {
                     .build();
 
             // Product Service에 재고 감소 요청
-            ApiResponseDto<StockUpdateResponse> response = productClient.updateStock(request, order.getUserId());
+            ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            if (response.isSuccess() && response.getData() != null && response.getData().getSuccess()) {
-                log.info("재고 감소 성공 - 주문 ID: {}", order.getOrderId());
-                logStockUpdateDetails(response.getData(), "감소");
+            if (response.isSuccess() && "OK".equals(response.getCode())) {
+                log.info("재고 감소 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
             } else {
                 log.error("재고 감소 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
                 throw new RuntimeException("재고 감소에 실패했습니다: " +
-                    (response.getData() != null ? response.getData().getMessage() : "알 수 없는 오류"));
+                    (response.getData() != null ? response.getData() : "알 수 없는 오류"));
             }
 
         } catch (Exception e) {
@@ -83,11 +82,10 @@ public class ProductStockServiceImpl implements ProductStockService {
                     .build();
 
             // Product Service에 재고 증가 요청
-            ApiResponseDto<StockUpdateResponse> response = productClient.updateStock(request, order.getUserId());
+            ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            if (response.isSuccess() && response.getData() != null && response.getData().getSuccess()) {
-                log.info("재고 증가 성공 - 주문 ID: {}", order.getOrderId());
-                logStockUpdateDetails(response.getData(), "증가");
+            if (response.isSuccess() && "OK".equals(response.getCode())) {
+                log.info("재고 증가 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
             } else {
                 log.error("재고 증가 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
                 // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
@@ -101,18 +99,7 @@ public class ProductStockServiceImpl implements ProductStockService {
         }
     }
 
-    /**
-     * 재고 업데이트 결과를 상세히 로깅합니다.
-     */
-    private void logStockUpdateDetails(StockUpdateResponse response, String operation) {
-        if (response.getUpdatedItems() != null) {
-            for (StockUpdateResponse.UpdatedStockItem item : response.getUpdatedItems()) {
-                log.info("재고 {} 상세 - 상품 ID: {}, 이전 재고: {}, 현재 재고: {}, 변경량: {}",
-                    operation, item.getProductId(), item.getPreviousStock(),
-                    item.getCurrentStock(), item.getQuantityChange());
-            }
-        }
-    }
+
 
     /**
      * 재고 감소 Circuit Breaker 폴백 메서드
