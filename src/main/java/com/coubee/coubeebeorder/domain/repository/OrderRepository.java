@@ -251,4 +251,33 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<WeeklyBreakdownProjection> getWeeklyBreakdown(@Param("startUnix") Long startUnix,
                                                        @Param("endUnix") Long endUnix,
                                                        @Param("storeId") Long storeId);
+
+    // ========================================
+    // User Order Summary Query Methods
+    // ========================================
+
+    /**
+     * Projection interface for user order summary aggregation
+     */
+    interface UserOrderSummaryProjection {
+        Long getTotalOrderCount();
+        Long getTotalOriginalAmount();
+        Long getTotalDiscountAmount();
+    }
+
+    /**
+     * Get user order summary aggregation for valid orders
+     * Only includes orders with status: PAID, PREPARING, PREPARED, RECEIVED
+     *
+     * @param userId user ID
+     * @return optional user order summary projection (empty if no valid orders found)
+     */
+    @Query("SELECT " +
+           "   count(o.id) as totalOrderCount, " +
+           "   COALESCE(sum(o.originalAmount), 0L) as totalOriginalAmount, " +
+           "   COALESCE(sum(o.discountAmount), 0L) as totalDiscountAmount " +
+           "FROM Order o " +
+           "WHERE o.userId = :userId " +
+           "AND o.status IN ('PAID', 'PREPARING', 'PREPARED', 'RECEIVED')")
+    Optional<UserOrderSummaryProjection> findUserOrderSummary(@Param("userId") Long userId);
 }

@@ -9,6 +9,7 @@ import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
+import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -35,4 +36,12 @@ public interface OrderService {
      * @param newStatus the new status
      */
     void updateOrderStatusWithHistory(String orderId, OrderStatus newStatus);
+
+    /**
+     * Get user order summary aggregation (for backend services)
+     *
+     * @param userId the user ID
+     * @return user order summary containing aggregated statistics
+     */
+    UserOrderSummaryDto getUserOrderSummary(Long userId);
 }

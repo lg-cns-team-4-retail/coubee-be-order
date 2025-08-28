@@ -7,6 +7,7 @@ import com.coubee.coubeebeorder.common.exception.NotFound;
 import com.coubee.coubeebeorder.domain.*;
 import com.coubee.coubeebeorder.domain.dto.*;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
+import com.coubee.coubeebeorder.domain.repository.OrderRepository.UserOrderSummaryProjection;
 import com.coubee.coubeebeorder.domain.repository.OrderTimestampRepository;
 import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
 import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -785,5 +787,30 @@ public class OrderServiceImpl implements OrderService {
         fallbackProduct.setSalePrice(0);
         fallbackProduct.setStock(0);
         return fallbackProduct;
+    }
+
+    @Override
+    public UserOrderSummaryDto getUserOrderSummary(Long userId) {
+        Optional<UserOrderSummaryProjection> projectionOpt = orderRepository.findUserOrderSummary(userId);
+
+        if (projectionOpt.isEmpty()) {
+            // Return DTO with zero values if no valid orders found
+            return UserOrderSummaryDto.builder()
+                    .totalOrderCount(0L)
+                    .totalOriginalAmount(0L)
+                    .totalDiscountAmount(0L)
+                    .finalPurchaseAmount(0L)
+                    .build();
+        }
+
+        UserOrderSummaryProjection projection = projectionOpt.get();
+        Long finalPurchaseAmount = projection.getTotalOriginalAmount() - projection.getTotalDiscountAmount();
+
+        return UserOrderSummaryDto.builder()
+                .totalOrderCount(projection.getTotalOrderCount())
+                .totalOriginalAmount(projection.getTotalOriginalAmount())
+                .totalDiscountAmount(projection.getTotalDiscountAmount())
+                .finalPurchaseAmount(finalPurchaseAmount)
+                .build();
     }
 }
