@@ -423,17 +423,19 @@ public class OrderServiceImpl implements OrderService {
                         order.getOrderId(), cancelStatus, storeName);
             }
         } catch (Exception e) {
-            log.error("주문 취소 알림 이벤트 발행 실패 - 주문: {}, 상태: {}", 
-                    order.getOrderId(), cancelStatus, e);
-        }
-    }
 
     private String getStoreName(Long storeId, Long userId) {
         try {
-            return storeClient.getStoreNameById(storeId, userId).getData();
+            ApiResponseDto<StoreResponseDto> response = storeClient.getStoreById(storeId, userId);
+            if (response != null && response.getData() != null) {
+                // Assuming StoreResponseDto has a getStoreName() method.
+                return response.getData().getStoreName();
+            }
+            log.warn("Failed to get store details - storeId: {}, userId: {}. Response data is null. Using default value.", storeId, userId);
+            return "매장"; // Default value
         } catch (Exception e) {
-            log.warn("매장명 조회 실패 - storeId: {}, userId: {}, 기본값 사용", storeId, userId, e);
-            return "매장";
+            log.warn("Failed to get store name - storeId: {}, userId: {}. Using default value.", storeId, userId, e);
+            return "매장"; // Default value
         }
     }
 
