@@ -50,8 +50,8 @@ public class ProductStockServiceImpl implements ProductStockService {
             // Product Service에 재고 감소 요청
             ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            // Only throw an exception if the response indicates failure
-            if (!response.isSuccess()) {
+            // Check for success based on response code (product-service doesn't set success field)
+            if (!"OK".equals(response.getCode())) {
                 log.error("재고 감소 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
                         order.getOrderId(), response.getCode(), response.getMessage());
                 throw new RuntimeException("재고 감소에 실패했습니다: " + response.getMessage());
@@ -88,15 +88,17 @@ public class ProductStockServiceImpl implements ProductStockService {
             // Product Service에 재고 증가 요청
             ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            if (!response.isSuccess()) {
-                log.error("재고 증가 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
+            // Check for success based on response code (product-service doesn't set success field)
+            if (!"OK".equals(response.getCode())) {
+                log.error("재고 증가(보상) 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
                         order.getOrderId(), response.getCode(), response.getMessage());
                 // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
-                log.warn("재고 증가 실패는 보상 트랜잭션이므로 처리를 계속합니다.");
-            } else {
-                // If we reach here, it means the operation was successful
-                log.info("재고 증가 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
+                log.warn("보상 트랜잭션 실패입니다. 처리는 계속되지만 수동 확인이 필요할 수 있습니다.");
+                return;
             }
+
+            // If we reach here, it means the operation was successful
+            log.info("재고 증가(보상) 성공 - 주문 ID: {}", order.getOrderId());
 
         } catch (Exception e) {
             log.error("재고 증가 중 오류 발생 - 주문 ID: {}", order.getOrderId(), e);
