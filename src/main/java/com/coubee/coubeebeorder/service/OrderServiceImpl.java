@@ -469,9 +469,14 @@ public class OrderServiceImpl implements OrderService {
 
     private String getStoreName(Long storeId, Long userId) {
         try {
-            return storeClient.getStoreNameById(storeId, userId).getData();
+            ApiResponseDto<StoreResponseDto> response = storeClient.getStoreById(storeId, userId);
+            if (response != null && response.getData() != null && response.getData().getStoreName() != null) {
+                return response.getData().getStoreName();
+            }
+            log.warn("Could not retrieve store name from detail response for storeId: {}", storeId);
+            return "매장";
         } catch (Exception e) {
-            log.warn("매장명 조회 실패 - storeId: {}, userId: {}, 기본값 사용", storeId, userId, e);
+            log.warn("Failed to get store details for storeId: {}, userId: {}. Using fallback name.", storeId, userId, e);
             return "매장";
         }
     }
