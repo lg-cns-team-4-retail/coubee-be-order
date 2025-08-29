@@ -53,9 +53,9 @@ public class ProductStockServiceImpl implements ProductStockService {
             if (response.isSuccess() && "OK".equals(response.getCode())) {
                 log.info("재고 감소 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
             } else {
-                log.error("재고 감소 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
-                throw new RuntimeException("재고 감소에 실패했습니다: " +
-                    (response.getData() != null ? response.getData() : "알 수 없는 오류"));
+                log.error("재고 감소 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
+                        order.getOrderId(), response.getCode(), response.getMessage());
+                throw new RuntimeException("재고 감소에 실패했습니다: " + response.getMessage());
             }
 
         } catch (Exception e) {
@@ -89,7 +89,8 @@ public class ProductStockServiceImpl implements ProductStockService {
             if (response.isSuccess() && "OK".equals(response.getCode())) {
                 log.info("재고 증가 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
             } else {
-                log.error("재고 증가 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
+                log.error("재고 증가 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
+                        order.getOrderId(), response.getCode(), response.getMessage());
                 // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
                 log.warn("재고 증가 실패는 보상 트랜잭션이므로 처리를 계속합니다.");
             }
