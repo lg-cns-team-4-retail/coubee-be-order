@@ -491,23 +491,39 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 주문 목록을 OrderDetailResponse 목록으로 변환
-     * Production compatibility: 개별 API 호출 방식으로 복원 (bulk API 미지원)
+     * 벌크 API를 사용하여 N+1 문제 해결
      */
     private List<OrderDetailResponse> convertToOrderDetailResponseList(List<Order> orders) {
         if (orders.isEmpty()) {
             return new ArrayList<>();
         }
 
-        // Individual API calls for production compatibility
+        // 첫 번째 주문의 userId를 사용 (모든 주문이 같은 사용자의 것이므로)
+        Long userId = orders.get(0).getUserId();
+
+        // 모든 주문에서 필요한 스토어 ID와 상품 ID 수집
+        Set<Long> storeIds = orders.stream()
+                .map(Order::getStoreId)
+                .collect(Collectors.toSet());
+
+        Set<Long> productIds = orders.stream()
+                .flatMap(order -> order.getItems().stream())
+                .map(item -> item.getProductId())
+                .collect(Collectors.toSet());
+
+        // 벌크 API로 스토어와 상품 데이터 조회
+        Map<Long, StoreResponseDto> storeMap = getBulkStoreData(storeIds, userId);
+        Map<Long, ProductResponseDto> productMap = getBulkProductData(productIds, userId);
+
+        // 벌크 데이터를 사용하여 주문 상세 응답 생성
         return orders.stream()
-                .map(this::convertToOrderDetailResponse)
+                .map(order -> convertToOrderDetailResponseWithMaps(order, storeMap, productMap))
                 .collect(Collectors.toList());
     }
 
-    // Bulk API methods commented out for production compatibility
-    // These APIs are not yet available in the production main branch
-
-    /*
+    /**
+     * 벌크 스토어 데이터 조회 (N+1 문제 해결)
+     */
     @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getBulkStoreDataFallback")
     private Map<Long, StoreResponseDto> getBulkStoreData(Set<Long> storeIds, Long userId) {
         if (storeIds.isEmpty()) {
@@ -519,6 +535,9 @@ public class OrderServiceImpl implements OrderService {
         return response.getData() != null ? response.getData() : Map.of();
     }
 
+    /**
+     * 벌크 상품 데이터 조회 (N+1 문제 해결)
+     */
     @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getBulkProductDataFallback")
     private Map<Long, ProductResponseDto> getBulkProductData(Set<Long> productIds, Long userId) {
         if (productIds.isEmpty()) {
@@ -529,10 +548,10 @@ public class OrderServiceImpl implements OrderService {
         ApiResponseDto<Map<Long, ProductResponseDto>> response = productClient.getProductsByIds(productIdList, userId);
         return response.getData() != null ? response.getData() : Map.of();
     }
-    */
 
-    // Bulk optimization method commented out for production compatibility
-    /*
+    /**
+     * 벌크 데이터를 사용한 주문 상세 응답 변환 (N+1 문제 해결)
+     */
     private OrderDetailResponse convertToOrderDetailResponseWithMaps(Order order,
                                                                      Map<Long, StoreResponseDto> storeMap,
                                                                      Map<Long, ProductResponseDto> productMap) {
@@ -598,7 +617,6 @@ public class OrderServiceImpl implements OrderService {
                 .statusHistory(historyDtos)
                 .build();
     }
-    */
 
     private OrderDetailResponse convertToOrderDetailResponse(Order order) {
         // Fetch store details with circuit breaker
@@ -723,8 +741,9 @@ public class OrderServiceImpl implements OrderService {
         return fallbackProduct;
     }
 
-    // Bulk fallback methods commented out for production compatibility
-    /*
+    /**
+     * 벌크 스토어 데이터 조회 폴백 메서드
+     */
     private Map<Long, StoreResponseDto> getBulkStoreDataFallback(Set<Long> storeIds, Long userId, Exception ex) {
         log.warn("Circuit breaker activated for bulk store data - Store IDs: {}, User ID: {}. Using fallback data.", storeIds, userId, ex);
 
@@ -735,6 +754,9 @@ public class OrderServiceImpl implements OrderService {
                 ));
     }
 
+    /**
+     * 벌크 상품 데이터 조회 폴백 메서드
+     */
     private Map<Long, ProductResponseDto> getBulkProductDataFallback(Set<Long> productIds, Long userId, Exception ex) {
         log.warn("Circuit breaker activated for bulk product data - Product IDs: {}, User ID: {}. Using fallback data.", productIds, userId, ex);
 
@@ -744,7 +766,6 @@ public class OrderServiceImpl implements OrderService {
                         this::createFallbackProductData
                 ));
     }
-    */
 
     /**
      * 폴백 스토어 데이터 생성
