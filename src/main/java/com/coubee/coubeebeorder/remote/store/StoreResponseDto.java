@@ -21,6 +21,10 @@ public class StoreResponseDto {
 
     private String workingHour;
 
+    private double latitude;
+
+    private double longitude;
+
     // Fallback flag to indicate if this data is from fallback mechanism
     private boolean fallback = false;
 

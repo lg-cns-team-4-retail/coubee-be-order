@@ -24,8 +24,9 @@ public class KafkaMessageProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    // 타겟 서비스별 토픽 정의
-    private static final String PRODUCT_SERVICE_TOPIC = "product-events";
+    // 타겟 서비스별 토픽 정의 - 컨슈머 기대값과 일치하도록 수정
+    private static final String STOCK_DECREASE_TOPIC = "stock_decrease";
+    private static final String STOCK_INCREASE_TOPIC = "stock_increase";
     private static final String NOTIFICATION_SERVICE_TOPIC = "notification-events";
 
     /**
@@ -36,8 +37,8 @@ public class KafkaMessageProducer {
             log.info("재고 감소 이벤트 발행: eventId={}, orderId={}", 
                     event.getEventId(), event.getOrderId());
 
-            CompletableFuture<SendResult<String, Object>> future = 
-                kafkaTemplate.send(PRODUCT_SERVICE_TOPIC, event.getOrderId(), event);
+            CompletableFuture<SendResult<String, Object>> future =
+                kafkaTemplate.send(STOCK_DECREASE_TOPIC, event.getOrderId(), event);
 
             future.whenComplete((result, ex) -> {
                 if (ex == null) {
@@ -66,8 +67,8 @@ public class KafkaMessageProducer {
             log.info("재고 증가 이벤트 발행: eventId={}, orderId={}", 
                     event.getEventId(), event.getOrderId());
 
-            CompletableFuture<SendResult<String, Object>> future = 
-                kafkaTemplate.send(PRODUCT_SERVICE_TOPIC, event.getOrderId(), event);
+            CompletableFuture<SendResult<String, Object>> future =
+                kafkaTemplate.send(STOCK_INCREASE_TOPIC, event.getOrderId(), event);
 
             future.whenComplete((result, ex) -> {
                 if (ex == null) {

@@ -698,6 +698,8 @@ public class OrderServiceImpl implements OrderService {
         fallbackStore.setStoreAddress("주소 정보 없음");
         fallbackStore.setContactNo("연락처 정보 없음");
         fallbackStore.setWorkingHour("영업시간 정보 없음");
+        fallbackStore.setLatitude(0.0);
+        fallbackStore.setLongitude(0.0);
         fallbackStore.setFallback(true);
 
         return fallbackStore;
@@ -755,6 +757,8 @@ public class OrderServiceImpl implements OrderService {
         fallbackStore.setStoreAddress("주소 정보 없음");
         fallbackStore.setContactNo("연락처 정보 없음");
         fallbackStore.setWorkingHour("영업시간 정보 없음");
+        fallbackStore.setLatitude(0.0);
+        fallbackStore.setLongitude(0.0);
         fallbackStore.setFallback(true);
         return fallbackStore;
     }

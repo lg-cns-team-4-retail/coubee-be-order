@@ -15,6 +15,7 @@ import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.domain.repository.PaymentRepository;
 import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
 import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
+import com.coubee.coubeebeorder.kafka.producer.product.event.StockDecreaseEvent;
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
 import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
@@ -347,17 +348,20 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             // 매장명 조회
             String storeName = getStoreName(order.getStoreId(), order.getUserId());
-            
+
             // PAID 타입 알림 이벤트 생성 및 발행
             OrderNotificationEvent notificationEvent = OrderNotificationEvent.createPaidNotification(
                     order.getOrderId(),
                     order.getUserId(),
                     storeName
             );
-            
+
             kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
             log.info("결제 완료 알림 이벤트 발행 완료 - 주문: {}, 매장: {}", order.getOrderId(), storeName);
-            
+
+            // 재고 감소 이벤트 발행 (비동기 처리용)
+            publishStockDecreaseEvent(order);
+
         } catch (Exception e) {
             log.error("결제 완료 알림 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
         }
@@ -369,6 +373,32 @@ public class PaymentServiceImpl implements PaymentService {
         } catch (Exception e) {
             log.warn("매장명 조회 실패 - storeId: {}, userId: {}, 기본값 사용", storeId, userId, e);
             return "매장";
+        }
+    }
+
+    private void publishStockDecreaseEvent(Order order) {
+        try {
+            // 주문 아이템을 StockDecreaseEvent.StockItem으로 변환
+            List<StockDecreaseEvent.StockItem> stockItems = order.getItems().stream()
+                    .map(item -> StockDecreaseEvent.StockItem.builder()
+                            .productId(item.getProductId())
+                            .quantity(item.getQuantity())
+                            .build())
+                    .collect(java.util.stream.Collectors.toList());
+
+            // 재고 감소 이벤트 생성 및 발행
+            StockDecreaseEvent stockDecreaseEvent = StockDecreaseEvent.create(
+                    order.getOrderId(),
+                    order.getUserId(),
+                    stockItems
+            );
+
+            kafkaMessageProducer.publishStockDecreaseEvent(stockDecreaseEvent);
+            log.info("재고 감소 이벤트 발행 완료 - 주문: {}, 아이템 수: {}",
+                    order.getOrderId(), stockItems.size());
+
+        } catch (Exception e) {
+            log.error("재고 감소 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
         }
     }
 
