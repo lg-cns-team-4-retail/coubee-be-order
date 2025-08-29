@@ -50,13 +50,15 @@ public class ProductStockServiceImpl implements ProductStockService {
             // Product Service에 재고 감소 요청
             ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            if (response.isSuccess() && "OK".equals(response.getCode())) {
-                log.info("재고 감소 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
-            } else {
+            // Only throw an exception if the response indicates failure
+            if (!response.isSuccess()) {
                 log.error("재고 감소 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
                         order.getOrderId(), response.getCode(), response.getMessage());
                 throw new RuntimeException("재고 감소에 실패했습니다: " + response.getMessage());
             }
+
+            // If we reach here, it means the operation was successful
+            log.info("재고 감소 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
 
         } catch (Exception e) {
             log.error("재고 감소 중 오류 발생 - 주문 ID: {}", order.getOrderId(), e);
@@ -86,13 +88,14 @@ public class ProductStockServiceImpl implements ProductStockService {
             // Product Service에 재고 증가 요청
             ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            if (response.isSuccess() && "OK".equals(response.getCode())) {
-                log.info("재고 증가 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
-            } else {
+            if (!response.isSuccess()) {
                 log.error("재고 증가 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
                         order.getOrderId(), response.getCode(), response.getMessage());
                 // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
                 log.warn("재고 증가 실패는 보상 트랜잭션이므로 처리를 계속합니다.");
+            } else {
+                // If we reach here, it means the operation was successful
+                log.info("재고 증가 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
             }
 
         } catch (Exception e) {
@@ -106,11 +109,23 @@ public class ProductStockServiceImpl implements ProductStockService {
 
     /**
      * 재고 감소 Circuit Breaker 폴백 메서드
-     * Product Service가 불가능할 때 즉시 결제 준비를 실패시킵니다.
+     * Product Service가 불가능할 때 보상 트랜잭션을 수행하고 결제 준비를 실패시킵니다.
      */
     public void decreaseStockFallback(Order order, Exception ex) {
-        log.error("Circuit breaker activated for decreaseStock - 주문 ID: {}, 매장 ID: {}. Product Service 불가능.",
-                order.getOrderId(), order.getStoreId(), ex);
+        log.error("Circuit breaker for decreaseStock is open for Order ID: {}. Attempting compensating transaction (restoring stock).",
+                order.getOrderId(), ex);
+
+        try {
+            // --- This is the compensating transaction ---
+            increaseStock(order);
+            log.info("Successfully restored stock (compensating transaction) for Order ID: {}", order.getOrderId());
+        } catch (Exception compensationException) {
+            // If the compensation also fails, log a critical error for manual intervention
+            log.error("CRITICAL: Compensating transaction FAILED for Order ID: {}. Manual stock correction is required.",
+                    order.getOrderId(), compensationException);
+        }
+
+        // Finally, throw a user-friendly exception to the client
         throw new ApiError("상품 서비스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.");
     }
 
