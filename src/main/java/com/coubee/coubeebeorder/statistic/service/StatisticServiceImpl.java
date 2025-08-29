@@ -4,7 +4,6 @@ import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.common.exception.ApiError;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
-import com.coubee.coubeebeorder.remote.user.UserClient;
 import com.coubee.coubeebeorder.statistic.dto.DailyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticDto;
 import com.coubee.coubeebeorder.statistic.dto.ProductSalesSummaryDto;
@@ -32,7 +31,6 @@ import java.util.stream.Collectors;
 public class StatisticServiceImpl implements StatisticService {
 
     private final OrderRepository orderRepository;
-    private final UserClient userClient;
     private final StoreClient storeClient;
 
     /**
@@ -45,12 +43,12 @@ public class StatisticServiceImpl implements StatisticService {
         }
 
         try {
-            // Get user's owned stores
-            ApiResponseDto<List<Long>> ownedStoresResponse = userClient.getMyOwnedStoreIds(userId);
+            // Get user's owned approved stores from store service
+            ApiResponseDto<List<Long>> ownedStoresResponse = storeClient.getStoresByOwnerIdOnApproved(userId);
             List<Long> ownedStoreIds = ownedStoresResponse.getData();
 
             if (ownedStoreIds == null || !ownedStoreIds.contains(storeId)) {
-                throw new ApiError("Access denied: You do not own this store");
+                throw new ApiError("Access denied: You do not own this store or it is not approved");
             }
 
             // Store status validation temporarily disabled for production compatibility

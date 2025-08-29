@@ -73,4 +73,13 @@ public interface StoreClient {
      */
     @GetMapping("/backend/store/{storeId}/validate-status")
     ApiResponseDto<Boolean> isStoreApproved(@PathVariable("storeId") Long storeId);
+
+    /**
+     * 사용자가 소유한 승인된 스토어 ID 목록 조회
+     *
+     * @param ownerId 소유자의 사용자 ID
+     * @return 승인된 스토어 ID 목록을 포함한 ApiResponseDto
+     */
+    @GetMapping("/backend/store/owner/{ownerId}/approved-stores")
+    ApiResponseDto<List<Long>> getStoresByOwnerIdOnApproved(@PathVariable("ownerId") Long ownerId);
 }
