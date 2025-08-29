@@ -3,13 +3,8 @@ package com.coubee.coubeebeorder.service;
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.common.exception.ApiError;
 import com.coubee.coubeebeorder.domain.Order;
-import com.coubee.coubeebeorder.domain.OrderItem;
-import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
-import com.coubee.coubeebeorder.kafka.producer.product.event.StockDecreaseEvent;
-import com.coubee.coubeebeorder.kafka.producer.product.event.StockIncreaseEvent;
 import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.product.StockUpdateRequest;
-import com.coubee.coubeebeorder.remote.product.StockUpdateResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +16,10 @@ import java.util.stream.Collectors;
 /**
  * 상품 재고 관리 서비스 구현체
  * Product Service와 동기적으로 통신하여 재고를 관리합니다.
+ *
+ * 아키텍처 원칙:
+ * - 재고 관리는 핵심 트랜잭션 경계로 동기적 처리 (OpenFeign)
+ * - Kafka는 사용하지 않음 (주문 상태 알림만 비동기 처리)
  */
 @Slf4j
 @Service
@@ -28,7 +27,6 @@ import java.util.stream.Collectors;
 public class ProductStockServiceImpl implements ProductStockService {
 
     private final ProductClient productClient;
-    private final KafkaMessageProducer kafkaMessageProducer;
 
     @Override
     @CircuitBreaker(name = "productStock", fallbackMethod = "decreaseStockFallback")
@@ -54,9 +52,6 @@ public class ProductStockServiceImpl implements ProductStockService {
 
             if (response.isSuccess() && "OK".equals(response.getCode())) {
                 log.info("재고 감소 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
-
-                // 재고 감소 성공 시 Kafka 이벤트 발행
-                publishStockDecreaseEvent(order);
             } else {
                 log.error("재고 감소 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
                 throw new RuntimeException("재고 감소에 실패했습니다: " +
@@ -93,9 +88,6 @@ public class ProductStockServiceImpl implements ProductStockService {
 
             if (response.isSuccess() && "OK".equals(response.getCode())) {
                 log.info("재고 증가 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
-
-                // 재고 증가 성공 시 Kafka 이벤트 발행
-                publishStockIncreaseEvent(order);
             } else {
                 log.error("재고 증가 실패 - 주문 ID: {}, 응답: {}", order.getOrderId(), response);
                 // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
@@ -132,61 +124,5 @@ public class ProductStockServiceImpl implements ProductStockService {
         // 보상 트랜잭션이므로 예외를 던지지 않음 - 주문 취소 플로우를 중단하지 않기 위함
     }
 
-    /**
-     * 재고 감소 Kafka 이벤트 발행
-     */
-    private void publishStockDecreaseEvent(Order order) {
-        try {
-            // 주문 아이템을 StockDecreaseEvent.StockItem으로 변환
-            List<StockDecreaseEvent.StockItem> stockItems = order.getItems().stream()
-                    .map(item -> StockDecreaseEvent.StockItem.builder()
-                            .productId(item.getProductId())
-                            .quantity(item.getQuantity())
-                            .build())
-                    .collect(Collectors.toList());
 
-            // 재고 감소 이벤트 생성 및 발행
-            StockDecreaseEvent stockDecreaseEvent = StockDecreaseEvent.create(
-                    order.getOrderId(),
-                    order.getUserId(),
-                    stockItems
-            );
-
-            kafkaMessageProducer.publishStockDecreaseEvent(stockDecreaseEvent);
-            log.info("재고 감소 이벤트 발행 완료 - 주문: {}, 아이템 수: {}",
-                    order.getOrderId(), stockItems.size());
-
-        } catch (Exception e) {
-            log.error("재고 감소 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
-        }
-    }
-
-    /**
-     * 재고 증가 Kafka 이벤트 발행
-     */
-    private void publishStockIncreaseEvent(Order order) {
-        try {
-            // 주문 아이템을 StockIncreaseEvent.StockItem으로 변환
-            List<StockIncreaseEvent.StockItem> stockItems = order.getItems().stream()
-                    .map(item -> StockIncreaseEvent.StockItem.builder()
-                            .productId(item.getProductId())
-                            .quantity(item.getQuantity())
-                            .build())
-                    .collect(Collectors.toList());
-
-            // 재고 증가 이벤트 생성 및 발행
-            StockIncreaseEvent stockIncreaseEvent = StockIncreaseEvent.create(
-                    order.getOrderId(),
-                    order.getUserId(),
-                    stockItems
-            );
-
-            kafkaMessageProducer.publishStockIncreaseEvent(stockIncreaseEvent);
-            log.info("재고 증가 이벤트 발행 완료 - 주문: {}, 아이템 수: {}",
-                    order.getOrderId(), stockItems.size());
-
-        } catch (Exception e) {
-            log.error("재고 증가 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
-        }
-    }
 }
