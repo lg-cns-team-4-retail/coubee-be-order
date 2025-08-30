@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -311,4 +312,220 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "WHERE o.userId = :userId " +
            "AND o.status IN ('PAID', 'PREPARING', 'PREPARED', 'RECEIVED')")
     Optional<UserOrderSummaryProjection> findUserOrderSummary(@Param("userId") Long userId);
+
+    // ========================================
+    // Enhanced Statistics Query Methods with Hotdeal Support
+    // ========================================
+
+    /**
+     * Projection interface for comprehensive statistics with hotdeal breakdown
+     */
+    interface ComprehensiveStatsProjection {
+        Long getTotalSalesAmount();
+        Integer getTotalOrderCount();
+        Integer getTotalItemCount();
+        Integer getUniqueCustomerCount();
+        Long getHotdealSalesAmount();
+        Integer getHotdealOrderCount();
+        Integer getHotdealItemCount();
+        Long getRegularSalesAmount();
+        Integer getRegularOrderCount();
+        Integer getRegularItemCount();
+    }
+
+    /**
+     * Get comprehensive statistics with hotdeal breakdown for a date range
+     *
+     * @param startUnix start timestamp (UNIX)
+     * @param endUnix end timestamp (UNIX)
+     * @param storeId store ID filter (optional)
+     * @return comprehensive statistics projection
+     */
+    @Query(value = """
+        SELECT
+            COALESCE(SUM(o.total_amount), 0) as totalSalesAmount,
+            COUNT(DISTINCT o.order_id) as totalOrderCount,
+            COALESCE(SUM(oi.quantity), 0) as totalItemCount,
+            COUNT(DISTINCT o.user_id) as uniqueCustomerCount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = true THEN oi.price * oi.quantity ELSE 0 END), 0) as hotdealSalesAmount,
+            COUNT(DISTINCT CASE WHEN oi.was_hotdeal = true THEN o.order_id END) as hotdealOrderCount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = true THEN oi.quantity ELSE 0 END), 0) as hotdealItemCount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = false THEN oi.price * oi.quantity ELSE 0 END), 0) as regularSalesAmount,
+            COUNT(DISTINCT CASE WHEN oi.was_hotdeal = false THEN o.order_id END) as regularOrderCount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = false THEN oi.quantity ELSE 0 END), 0) as regularItemCount
+        FROM orders o
+        JOIN order_items oi ON o.order_id = oi.order_id
+        WHERE o.status = 'RECEIVED'
+        AND o.paid_at_unix BETWEEN :startUnix AND :endUnix
+        AND (:storeId IS NULL OR o.store_id = :storeId)
+        """, nativeQuery = true)
+    ComprehensiveStatsProjection getComprehensiveStatistics(@Param("startUnix") Long startUnix,
+                                                           @Param("endUnix") Long endUnix,
+                                                           @Param("storeId") Long storeId);
+
+    /**
+     * Projection interface for hourly breakdown with hotdeal support
+     */
+    interface HourlyBreakdownProjection {
+        Integer getHour();
+        Long getSalesAmount();
+        Integer getOrderCount();
+        Long getHotdealSalesAmount();
+        Long getRegularSalesAmount();
+    }
+
+    /**
+     * Get hourly breakdown with hotdeal analysis for a specific day
+     *
+     * @param startUnix start timestamp (UNIX)
+     * @param endUnix end timestamp (UNIX)
+     * @param storeId store ID filter (optional)
+     * @return list of hourly breakdown projections
+     */
+    @Query(value = """
+        SELECT
+            EXTRACT(HOUR FROM TO_TIMESTAMP(o.paid_at_unix)) as hour,
+            COALESCE(SUM(o.total_amount), 0) as salesAmount,
+            COUNT(DISTINCT o.order_id) as orderCount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = true THEN oi.price * oi.quantity ELSE 0 END), 0) as hotdealSalesAmount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = false THEN oi.price * oi.quantity ELSE 0 END), 0) as regularSalesAmount
+        FROM orders o
+        JOIN order_items oi ON o.order_id = oi.order_id
+        WHERE o.status = 'RECEIVED'
+        AND o.paid_at_unix BETWEEN :startUnix AND :endUnix
+        AND (:storeId IS NULL OR o.store_id = :storeId)
+        GROUP BY EXTRACT(HOUR FROM TO_TIMESTAMP(o.paid_at_unix))
+        ORDER BY hour
+        """, nativeQuery = true)
+    List<HourlyBreakdownProjection> getHourlyBreakdownWithHotdeal(@Param("startUnix") Long startUnix,
+                                                                  @Param("endUnix") Long endUnix,
+                                                                  @Param("storeId") Long storeId);
+
+    /**
+     * Projection interface for daily breakdown with hotdeal support
+     */
+    interface DailyBreakdownWithHotdealProjection {
+        String getDayOfWeek();
+        LocalDate getOrderDate();
+        Long getSalesAmount();
+        Integer getOrderCount();
+        Long getHotdealSalesAmount();
+        Long getRegularSalesAmount();
+    }
+
+    /**
+     * Get daily breakdown with hotdeal analysis for a week
+     *
+     * @param startUnix start timestamp (UNIX)
+     * @param endUnix end timestamp (UNIX)
+     * @param storeId store ID filter (optional)
+     * @return list of daily breakdown projections
+     */
+    @Query(value = """
+        SELECT
+            TO_CHAR(TO_TIMESTAMP(o.paid_at_unix), 'DAY') as dayOfWeek,
+            DATE(TO_TIMESTAMP(o.paid_at_unix)) as orderDate,
+            COALESCE(SUM(o.total_amount), 0) as salesAmount,
+            COUNT(DISTINCT o.order_id) as orderCount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = true THEN oi.price * oi.quantity ELSE 0 END), 0) as hotdealSalesAmount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = false THEN oi.price * oi.quantity ELSE 0 END), 0) as regularSalesAmount
+        FROM orders o
+        JOIN order_items oi ON o.order_id = oi.order_id
+        WHERE o.status = 'RECEIVED'
+        AND o.paid_at_unix BETWEEN :startUnix AND :endUnix
+        AND (:storeId IS NULL OR o.store_id = :storeId)
+        GROUP BY TO_CHAR(TO_TIMESTAMP(o.paid_at_unix), 'DAY'), DATE(TO_TIMESTAMP(o.paid_at_unix))
+        ORDER BY orderDate
+        """, nativeQuery = true)
+    List<DailyBreakdownWithHotdealProjection> getDailyBreakdownWithHotdeal(@Param("startUnix") Long startUnix,
+                                                                           @Param("endUnix") Long endUnix,
+                                                                           @Param("storeId") Long storeId);
+
+    /**
+     * Projection interface for weekly breakdown with hotdeal support
+     */
+    interface WeeklyBreakdownWithHotdealProjection {
+        Integer getWeekNumber();
+        LocalDate getWeekStartDate();
+        LocalDate getWeekEndDate();
+        Long getSalesAmount();
+        Integer getOrderCount();
+        Long getHotdealSalesAmount();
+        Long getRegularSalesAmount();
+    }
+
+    /**
+     * Get weekly breakdown with hotdeal analysis for a month
+     *
+     * @param startUnix start timestamp (UNIX)
+     * @param endUnix end timestamp (UNIX)
+     * @param storeId store ID filter (optional)
+     * @return list of weekly breakdown projections
+     */
+    @Query(value = """
+        SELECT
+            EXTRACT(WEEK FROM TO_TIMESTAMP(o.paid_at_unix)) - EXTRACT(WEEK FROM DATE_TRUNC('month', TO_TIMESTAMP(o.paid_at_unix))) + 1 as weekNumber,
+            DATE_TRUNC('week', TO_TIMESTAMP(o.paid_at_unix))::date as weekStartDate,
+            (DATE_TRUNC('week', TO_TIMESTAMP(o.paid_at_unix)) + INTERVAL '6 days')::date as weekEndDate,
+            COALESCE(SUM(o.total_amount), 0) as salesAmount,
+            COUNT(DISTINCT o.order_id) as orderCount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = true THEN oi.price * oi.quantity ELSE 0 END), 0) as hotdealSalesAmount,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = false THEN oi.price * oi.quantity ELSE 0 END), 0) as regularSalesAmount
+        FROM orders o
+        JOIN order_items oi ON o.order_id = oi.order_id
+        WHERE o.status = 'RECEIVED'
+        AND o.paid_at_unix BETWEEN :startUnix AND :endUnix
+        AND (:storeId IS NULL OR o.store_id = :storeId)
+        GROUP BY EXTRACT(WEEK FROM TO_TIMESTAMP(o.paid_at_unix)), DATE_TRUNC('week', TO_TIMESTAMP(o.paid_at_unix))
+        ORDER BY weekStartDate
+        """, nativeQuery = true)
+    List<WeeklyBreakdownWithHotdealProjection> getWeeklyBreakdownWithHotdeal(@Param("startUnix") Long startUnix,
+                                                                             @Param("endUnix") Long endUnix,
+                                                                             @Param("storeId") Long storeId);
+
+    /**
+     * Projection interface for sold items summary with hotdeal breakdown
+     */
+    interface SoldItemsSummaryProjection {
+        Long getProductId();
+        String getProductName();
+        Integer getTotalQuantity();
+        Long getTotalRevenue();
+        Integer getHotdealQuantity();
+        Long getHotdealRevenue();
+        Integer getRegularQuantity();
+        Long getRegularRevenue();
+        Boolean getWasPartOfHotdeal();
+    }
+
+    /**
+     * Get sold items summary with hotdeal breakdown for a date range
+     *
+     * @param startUnix start timestamp (UNIX)
+     * @param endUnix end timestamp (UNIX)
+     * @param storeId store ID filter (optional)
+     * @return list of sold items summary projections
+     */
+    @Query(value = """
+        SELECT
+            oi.product_id as productId,
+            oi.product_name as productName,
+            SUM(oi.quantity) as totalQuantity,
+            SUM(oi.price * oi.quantity) as totalRevenue,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = true THEN oi.quantity ELSE 0 END), 0) as hotdealQuantity,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = true THEN oi.price * oi.quantity ELSE 0 END), 0) as hotdealRevenue,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = false THEN oi.quantity ELSE 0 END), 0) as regularQuantity,
+            COALESCE(SUM(CASE WHEN oi.was_hotdeal = false THEN oi.price * oi.quantity ELSE 0 END), 0) as regularRevenue,
+            CASE WHEN SUM(CASE WHEN oi.was_hotdeal = true THEN 1 ELSE 0 END) > 0 THEN true ELSE false END as wasPartOfHotdeal
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.order_id
+        WHERE o.status = 'RECEIVED'
+        AND o.paid_at_unix BETWEEN :startUnix AND :endUnix
+        AND (:storeId IS NULL OR o.store_id = :storeId)
+        GROUP BY oi.product_id, oi.product_name
+        ORDER BY totalRevenue DESC
+        """, nativeQuery = true)
+    List<SoldItemsSummaryProjection> getSoldItemsSummaryWithHotdeal(@Param("startUnix") Long startUnix,
+                                                                    @Param("endUnix") Long endUnix,
+                                                                    @Param("storeId") Long storeId);
 }

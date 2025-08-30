@@ -102,18 +102,18 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Hotdeal logic temporarily disabled for production compatibility
-        // The hotdeal API is not yet available in the production main branch
+        // Check for active hotdeal and track hotdeal status
         int discountAmount = 0;
         int finalAmount = originalAmount;
+        boolean isHotdealActive = false;
 
-        /*
         try {
             log.debug("Checking for active hotdeal for storeId: {}", request.getStoreId());
             ApiResponseDto<HotdealResponseDto> hotdealResponse = storeClient.getActiveHotdeal(request.getStoreId());
 
             if (hotdealResponse != null && hotdealResponse.getData() != null) {
                 HotdealResponseDto hotdeal = hotdealResponse.getData();
+                isHotdealActive = true;
                 log.info("Active hotdeal found for storeId: {}, saleRate: {}, maxDiscount: {}",
                         request.getStoreId(), hotdeal.getSaleRate(), hotdeal.getMaxDiscount());
 
@@ -132,22 +132,24 @@ public class OrderServiceImpl implements OrderService {
                     request.getStoreId(), e.getMessage());
             // Continue without discount if hotdeal service fails
         }
-        */
 
         // Create order with original amount, discount amount, and final amount
         Order order = Order.createOrder(
                 orderId, userId, request.getStoreId(), originalAmount, discountAmount, finalAmount, request.getRecipientName());
 
-        // Add order items with real product data
+        // Add order items with real product data and hotdeal status
         for (int i = 0; i < request.getItems().size(); i++) {
             OrderCreateRequest.OrderItemRequest itemRequest = request.getItems().get(i);
             ProductResponseDto product = productDetails.get(i);
 
-            OrderItem orderItem = OrderItem.createOrderItem(
+            // Create order item with hotdeal status
+            OrderItem orderItem = OrderItem.createOrderItemWithHotdeal(
                     itemRequest.getProductId(),
                     product.getProductName(),
                     itemRequest.getQuantity(),
-                    product.getSalePrice()
+                    product.getSalePrice(),
+                    EventType.PURCHASE,
+                    isHotdealActive
             );
             order.addOrderItem(orderItem);
         }

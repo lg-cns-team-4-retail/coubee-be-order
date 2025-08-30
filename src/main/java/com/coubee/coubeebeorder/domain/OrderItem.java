@@ -38,14 +38,18 @@ public class OrderItem extends BaseTimeEntity {
     @Column(name = "event_type")
     private EventType eventType;
 
+    @Column(name = "was_hotdeal", nullable = false)
+    private Boolean wasHotdeal = false;
+
     @Builder
-    private OrderItem(Order order, Long productId, String productName, Integer quantity, Integer price, EventType eventType) {
+    private OrderItem(Order order, Long productId, String productName, Integer quantity, Integer price, EventType eventType, Boolean wasHotdeal) {
         this.order = order;
         this.productId = productId;
         this.productName = productName;
         this.quantity = quantity;
         this.price = price;
         this.eventType = eventType;
+        this.wasHotdeal = wasHotdeal != null ? wasHotdeal : false;
     }
 
     public static OrderItem createOrderItem(Long productId, String productName, Integer quantity, Integer price) {
@@ -55,6 +59,7 @@ public class OrderItem extends BaseTimeEntity {
                 .quantity(quantity)
                 .price(price)
                 .eventType(EventType.PURCHASE) // 기본값으로 PURCHASE 설정
+                .wasHotdeal(false)
                 .build();
     }
 
@@ -75,6 +80,29 @@ public class OrderItem extends BaseTimeEntity {
                 .quantity(quantity)
                 .price(price)
                 .eventType(eventType)
+                .wasHotdeal(false)
+                .build();
+    }
+
+    /**
+     * Create order item with hotdeal status
+     *
+     * @param productId product ID
+     * @param productName product name
+     * @param quantity quantity
+     * @param price price
+     * @param eventType event type
+     * @param wasHotdeal whether this item was purchased during a hotdeal
+     * @return created order item
+     */
+    public static OrderItem createOrderItemWithHotdeal(Long productId, String productName, Integer quantity, Integer price, EventType eventType, Boolean wasHotdeal) {
+        return OrderItem.builder()
+                .productId(productId)
+                .productName(productName)
+                .quantity(quantity)
+                .price(price)
+                .eventType(eventType)
+                .wasHotdeal(wasHotdeal != null ? wasHotdeal : false)
                 .build();
     }
 

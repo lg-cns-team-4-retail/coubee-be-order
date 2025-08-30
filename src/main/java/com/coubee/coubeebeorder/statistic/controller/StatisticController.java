@@ -2,9 +2,12 @@ package com.coubee.coubeebeorder.statistic.controller;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.statistic.dto.DailyStatisticDto;
+import com.coubee.coubeebeorder.statistic.dto.DailyStatisticResponseDto;
 import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticDto;
+import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticResponseDto;
 import com.coubee.coubeebeorder.statistic.dto.ProductSalesSummaryDto;
 import com.coubee.coubeebeorder.statistic.dto.WeeklyStatisticDto;
+import com.coubee.coubeebeorder.statistic.dto.WeeklyStatisticResponseDto;
 import com.coubee.coubeebeorder.statistic.service.StatisticService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -81,6 +84,57 @@ public class StatisticController {
             @RequestParam LocalDate endDate) {
 
         List<ProductSalesSummaryDto> response = statisticService.getProductSalesSummary(storeId, startDate, endDate, userId);
+        return ApiResponseDto.readOk(response);
+    }
+
+    // ========================================
+    // Enhanced Statistics Endpoints with Hotdeal Support
+    // ========================================
+
+    @Operation(summary = "Get Comprehensive Daily Sales Statistics with Hotdeal Breakdown",
+               description = "Retrieves comprehensive daily sales statistics with hotdeal analysis for dashboard (Store Owner only)")
+    @GetMapping("/sales/daily/comprehensive")
+    public ApiResponseDto<DailyStatisticResponseDto> getComprehensiveDailyStatistics(
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
+            @Parameter(description = "Date for statistics", required = true, example = "2023-06-01")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "Store ID for filtering (required)", required = true, example = "1")
+            @RequestParam Long storeId) {
+
+        DailyStatisticResponseDto response = statisticService.getDailyStatisticsWithHotdeal(date, storeId, userId);
+        return ApiResponseDto.readOk(response);
+    }
+
+    @Operation(summary = "Get Comprehensive Weekly Sales Statistics with Hotdeal Breakdown",
+               description = "Retrieves comprehensive weekly sales statistics with hotdeal analysis for dashboard (Store Owner only)")
+    @GetMapping("/sales/weekly/comprehensive")
+    public ApiResponseDto<WeeklyStatisticResponseDto> getComprehensiveWeeklyStatistics(
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
+            @Parameter(description = "Week start date", required = true, example = "2023-05-29")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate,
+            @Parameter(description = "Store ID for filtering (required)", required = true, example = "1")
+            @RequestParam Long storeId) {
+
+        WeeklyStatisticResponseDto response = statisticService.getWeeklyStatisticsWithHotdeal(weekStartDate, storeId, userId);
+        return ApiResponseDto.readOk(response);
+    }
+
+    @Operation(summary = "Get Comprehensive Monthly Sales Statistics with Hotdeal Breakdown",
+               description = "Retrieves comprehensive monthly sales statistics with hotdeal analysis for dashboard (Store Owner only)")
+    @GetMapping("/sales/monthly/comprehensive")
+    public ApiResponseDto<MonthlyStatisticResponseDto> getComprehensiveMonthlyStatistics(
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId,
+            @Parameter(description = "Year", required = true, example = "2023")
+            @RequestParam int year,
+            @Parameter(description = "Month (1-12)", required = true, example = "6")
+            @RequestParam int month,
+            @Parameter(description = "Store ID for filtering (required)", required = true, example = "1")
+            @RequestParam Long storeId) {
+
+        MonthlyStatisticResponseDto response = statisticService.getMonthlyStatisticsWithHotdeal(year, month, storeId, userId);
         return ApiResponseDto.readOk(response);
     }
 }
