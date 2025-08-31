@@ -9,6 +9,7 @@ import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
+import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
 import com.coubee.coubeebeorder.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -70,6 +71,15 @@ public class OrderController {
         // Sort는 OrderService에서 처리하므로 여기서는 제거
         PageRequest pageRequest = PageRequest.of(page, size);
         Page<OrderDetailResponse> response = orderService.getUserOrders(userId, pageRequest);
+        return ApiResponseDto.readOk(response);
+    }
+
+    @Operation(summary = "Get My Order Summary", description = "Retrieves order summary (total amounts, counts) for the authenticated user.")
+    @GetMapping("/users/me/summary")
+    public ApiResponseDto<UserOrderSummaryDto> getMyOrderSummary(
+            @Parameter(description = "User ID from authentication", hidden = true)
+            @RequestHeader("X-Auth-UserId") Long userId) {
+        UserOrderSummaryDto response = orderService.getUserOrderSummary(userId);
         return ApiResponseDto.readOk(response);
     }
 
