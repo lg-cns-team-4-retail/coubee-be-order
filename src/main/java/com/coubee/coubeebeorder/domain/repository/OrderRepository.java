@@ -476,7 +476,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         WHERE o.status = 'RECEIVED'
         AND o.paid_at_unix BETWEEN :startUnix AND :endUnix
         AND (:storeId IS NULL OR o.store_id = :storeId)
-        GROUP BY EXTRACT(WEEK FROM TO_TIMESTAMP(o.paid_at_unix)), DATE_TRUNC('week', TO_TIMESTAMP(o.paid_at_unix))
+        GROUP BY EXTRACT(WEEK FROM TO_TIMESTAMP(o.paid_at_unix)) - EXTRACT(WEEK FROM DATE_TRUNC('month', TO_TIMESTAMP(o.paid_at_unix))) + 1, DATE_TRUNC('week', TO_TIMESTAMP(o.paid_at_unix))
         ORDER BY weekStartDate
         """, nativeQuery = true)
     List<WeeklyBreakdownWithHotdealProjection> getWeeklyBreakdownWithHotdeal(@Param("startUnix") Long startUnix,

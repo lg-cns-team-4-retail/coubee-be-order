@@ -48,7 +48,7 @@ public class StatisticServiceImpl implements StatisticService {
             List<Long> ownedStoreIds = ownedStoresResponse.getData();
 
             if (ownedStoreIds == null || !ownedStoreIds.contains(storeId)) {
-                throw new ApiError("Access denied: You do not own this store or it is not approved");
+                throw new IllegalArgumentException("You can only view statistics for registered stores you own.");
             }
 
             // Store status validation temporarily disabled for production compatibility
