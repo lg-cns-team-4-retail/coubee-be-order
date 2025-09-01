@@ -419,31 +419,39 @@ public class OrderServiceImpl implements OrderService {
 
     private void publishCancelNotificationEvent(Order order, OrderStatus cancelStatus) {
         try {
-            String storeName = getStoreName(order.getStoreId(), order.getUserId());
-            
-            OrderNotificationEvent notificationEvent = null;
+            // [수정] StoreClient를 통해 매장 정보를 조회합니다. (translation: [MODIFIED] Fetch store information via StoreClient.)
+            ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
+            String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장";
+
             if (cancelStatus == OrderStatus.CANCELLED_USER) {
-                notificationEvent = OrderNotificationEvent.createCancelledUserNotification(
+                // 고객이 취소한 경우 (translation: When the customer cancels)
+
+                // TODO: StoreResponseDto needs to be extended with ownerId field to properly implement bidirectional notifications
+                // For now, we'll log this limitation and send notifications to customer only
+                log.warn("StoreResponseDto doesn't contain ownerId field. Cannot send notification to store owner for storeId: {}", order.getStoreId());
+                log.info("Bidirectional notification implementation requires StoreResponseDto.ownerId field to be added by store-service team");
+
+                // 2. 고객에게 보낼 '취소 완료' 알림 (translation: 2. "Cancellation Confirmed" notification for the customer)
+                OrderNotificationEvent forCustomer = OrderNotificationEvent.createCancelledUserNotification(
                         order.getOrderId(),
-                        order.getUserId(),
+                        order.getUserId(), // ★ 알림 수신 대상을 고객 ID로 설정 (translation: ★ Set recipient to customer's userId)
                         storeName
                 );
+                kafkaMessageProducer.publishOrderNotificationEvent(forCustomer);
+
             } else if (cancelStatus == OrderStatus.CANCELLED_ADMIN) {
-                notificationEvent = OrderNotificationEvent.createCancelledAdminNotification(
+                // 점주가 취소한 경우 (기존 로직 유지, 고객에게만 발송) 
+                // (translation: When the admin cancels (maintain existing logic, send only to customer))
+                OrderNotificationEvent forCustomer = OrderNotificationEvent.createCancelledAdminNotification(
                         order.getOrderId(),
                         order.getUserId(),
                         storeName
                 );
+                kafkaMessageProducer.publishOrderNotificationEvent(forCustomer);
             }
             
-            if (notificationEvent != null) {
-                kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
-                log.info("주문 취소 알림 이벤트 발행 완료 - 주문: {}, 상태: {}, 매장: {}", 
-                        order.getOrderId(), cancelStatus, storeName);
-            }
         } catch (Exception e) {
-            log.error("주문 취소 알림 이벤트 발행 실패 - 주문: {}, 상태: {}", 
-                    order.getOrderId(), cancelStatus, e);
+            log.error("Failed to publish order cancellation notification event - Order: {}", order.getOrderId(), e);
         }
     }
 

@@ -358,21 +358,28 @@ public class PaymentServiceImpl implements PaymentService {
 
     private void publishPaymentCompletedEvent(Order order, Payment payment) {
         try {
-            // 매장명 조회
-            String storeName = getStoreName(order.getStoreId(), order.getUserId());
+            // [수정] StoreClient를 통해 매장 정보를 조회합니다.
+            // (translation: [MODIFIED] Fetch store information via StoreClient.)
+            // Note: Current StoreResponseDto doesn't include ownerId, so we'll implement a fallback approach
+            ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
+            String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장";
 
-            // PAID 타입 알림 이벤트 생성 및 발행
-            OrderNotificationEvent notificationEvent = OrderNotificationEvent.createPaidNotification(
+            // TODO: StoreResponseDto needs to be extended with ownerId field to properly implement bidirectional notifications
+            // For now, we'll log this limitation and send notifications to customer only
+            log.warn("StoreResponseDto doesn't contain ownerId field. Cannot send notification to store owner for storeId: {}", order.getStoreId());
+            log.info("Bidirectional notification implementation requires StoreResponseDto.ownerId field to be added by store-service team");
+
+            // 2. 고객에게 보낼 '결제 완료' 알림 (translation: 2. "Payment Completed" notification for the customer)
+            OrderNotificationEvent forCustomer = OrderNotificationEvent.createPaidNotification(
                     order.getOrderId(),
-                    order.getUserId(),
+                    order.getUserId(), // ★ 알림 수신 대상을 고객 ID로 설정 (translation: ★ Set recipient to customer's userId)
                     storeName
             );
-
-            kafkaMessageProducer.publishOrderNotificationEvent(notificationEvent);
-            log.info("결제 완료 알림 이벤트 발행 완료 - 주문: {}, 매장: {}", order.getOrderId(), storeName);
+            kafkaMessageProducer.publishOrderNotificationEvent(forCustomer);
+            log.info("Payment completion notification published (to Customer) - Order: {}, Customer: {}", order.getOrderId(), order.getUserId());
 
         } catch (Exception e) {
-            log.error("결제 완료 알림 이벤트 발행 실패 - 주문: {}", order.getOrderId(), e);
+            log.error("Failed to publish payment completion notification event - Order: {}", order.getOrderId(), e);
         }
     }
 

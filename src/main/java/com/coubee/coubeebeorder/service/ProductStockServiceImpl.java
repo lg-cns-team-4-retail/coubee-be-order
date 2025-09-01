@@ -3,6 +3,8 @@ package com.coubee.coubeebeorder.service;
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.common.exception.ApiError;
 import com.coubee.coubeebeorder.domain.Order;
+import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
+import com.coubee.coubeebeorder.kafka.producer.product.event.StockIncreaseEvent;
 import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.product.StockUpdateRequest;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 public class ProductStockServiceImpl implements ProductStockService {
 
     private final ProductClient productClient;
+    private final KafkaMessageProducer kafkaMessageProducer; // ★ KafkaMessageProducer must be injected
 
     @Override
     @Transactional
@@ -70,43 +73,39 @@ public class ProductStockServiceImpl implements ProductStockService {
 
     @Override
     @Transactional
-    @CircuitBreaker(name = "productStock", fallbackMethod = "increaseStockFallback")
     public void increaseStock(Order order) {
-        log.info("재고 증가 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
+        log.info("재고 증가 이벤트 발행 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
+        // (translation: Request to publish stock increase event - Order ID: ..., Store ID: ...)
 
         try {
-            // 주문 아이템들을 재고 증가 요청으로 변환 (양수로 설정)
-            List<StockUpdateRequest.StockItem> stockItems = order.getItems().stream()
-                    .map(item -> StockUpdateRequest.StockItem.builder()
+            // [수정] OpenFeign 호출 대신 Kafka 메시지를 발행합니다.
+            // (translation: [MODIFIED] Publish a Kafka message instead of making an OpenFeign call.)
+            
+            // 1. StockIncreaseEvent에 필요한 StockItem 리스트 생성
+            // (translation: 1. Create the list of StockItems required for the StockIncreaseEvent)
+            List<StockIncreaseEvent.StockItem> stockItems = order.getItems().stream()
+                    .map(item -> StockIncreaseEvent.StockItem.builder()
                             .productId(item.getProductId())
-                            .quantityChange(item.getQuantity()) // 양수로 설정하여 재고 증가
+                            .quantity(item.getQuantity())
                             .build())
                     .collect(Collectors.toList());
 
-            StockUpdateRequest request = StockUpdateRequest.builder()
-                    .storeId(order.getStoreId())
-                    .items(stockItems)
-                    .build();
+            // 2. StockIncreaseEvent 생성 (translation: 2. Create the StockIncreaseEvent)
+            StockIncreaseEvent event = StockIncreaseEvent.create(
+                order.getOrderId(),
+                order.getUserId(),
+                stockItems
+            );
 
-            // Product Service에 재고 증가 요청
-            ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
+            // 3. Kafka 메시지 발행 (translation: 3. Publish the Kafka message)
+            kafkaMessageProducer.publishStockIncreaseEvent(event);
 
-            // Check for success based on response code (product-service doesn't set success field)
-            if (!"OK".equals(response.getCode())) {
-                log.error("재고 증가(보상) 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
-                        order.getOrderId(), response.getCode(), response.getMessage());
-                // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
-                log.warn("보상 트랜잭션 실패입니다. 처리는 계속되지만 수동 확인이 필요할 수 있습니다.");
-                return;
-            }
-
-            // If we reach here, it means the operation was successful
-            log.info("재고 증가(보상) 성공 - 주문 ID: {}", order.getOrderId());
+            log.info("재고 증가(보상) 이벤트 발행 성공 - 주문 ID: {}", order.getOrderId());
+            // (translation: Successfully published stock increase (compensation) event - Order ID: ...)
 
         } catch (Exception e) {
-            log.error("재고 증가 중 오류 발생 - 주문 ID: {}", order.getOrderId(), e);
-            // 재고 증가는 보상 트랜잭션이므로 실패해도 예외를 던지지 않고 로그만 남김
-            log.warn("재고 증가 실패는 보상 트랜잭션이므로 처리를 계속합니다.");
+            log.error("재고 증가 이벤트 발행 중 오류 발생 - 주문 ID: {}. 메시지 처리는 계속되지만 수동 확인이 필요할 수 있습니다.", order.getOrderId(), e);
+            // (translation: Error while publishing stock increase event - Order ID: .... Processing will continue, but manual verification may be required.)
         }
     }
 
