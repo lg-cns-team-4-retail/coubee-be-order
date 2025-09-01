@@ -227,7 +227,7 @@ public class OrderServiceImpl implements OrderService {
         // V3: 주문 취소 시 모든 주문 아이템의 이벤트 타입을 REFUND로 설정
         order.getItems().forEach(item -> item.updateEventType(EventType.REFUND));
 
-        orderRepository.save(order);
+        // orderRepository.save(order); // Redundant call removed - managed entity changes are automatically persisted
 
         // 재고 복원 처리 - 주문 취소 시점에 재고를 복원합니다.
         log.info("재고 복원 처리 시작 - 주문 ID: {}", orderId);
@@ -294,7 +294,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         updateOrderStatusAndCreateHistory(order, OrderStatus.RECEIVED);
-        orderRepository.save(order);
+        // orderRepository.save(order); // Redundant call removed - managed entity changes are automatically persisted
 
         log.info("Order marked as received successfully: {}", orderId);
         return convertToOrderDetailResponse(order);
@@ -313,7 +313,7 @@ public class OrderServiceImpl implements OrderService {
         validateStatusTransition(previousStatus, request.getStatus());
 
         updateOrderStatusAndCreateHistory(order, request.getStatus());
-        orderRepository.save(order);
+        // orderRepository.save(order); // Redundant call removed - managed entity changes are automatically persisted
 
         log.info("Order status updated successfully: {} -> {}", previousStatus, request.getStatus());
 
@@ -336,7 +336,7 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다. Order ID: " + orderId));
 
         updateOrderStatusAndCreateHistory(order, newStatus);
-        orderRepository.save(order);
+        // orderRepository.save(order); // Redundant call removed - managed entity changes are automatically persisted
 
         log.info("Order status updated with history successfully: {}", orderId);
     }

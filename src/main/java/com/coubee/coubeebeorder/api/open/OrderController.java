@@ -1,6 +1,7 @@
 package com.coubee.coubeebeorder.api.open;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import com.coubee.coubeebeorder.common.web.context.GatewayRequestHeaderUtils;
 import com.coubee.coubeebeorder.domain.dto.OrderCancelRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderCreateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderCreateResponse;
@@ -34,9 +35,11 @@ public class OrderController {
     @PostMapping("/orders")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponseDto<OrderCreateResponse> createOrder(
-            @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-Auth-UserId") Long userId,
             @Valid @RequestBody OrderCreateRequest request) {
+
+        // 컨트롤러가 직접 헤더에서 userId를 가져옵니다.
+        Long userId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
+
         OrderCreateResponse response = orderService.createOrder(userId, request);
         return ApiResponseDto.createOk(response);
     }
@@ -62,14 +65,15 @@ public class OrderController {
     @Operation(summary = "Get My Orders", description = "Retrieves detailed order list for authenticated user. Can be filtered by keyword.")
     @GetMapping("/users/me/orders")
     public ApiResponseDto<Page<OrderDetailResponse>> getMyOrders(
-            @Parameter(description = "User ID from authentication", hidden = true)
-            @RequestHeader("X-Auth-UserId") Long userId,
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "Search keyword for product name", example = "bacon")
             @RequestParam(required = false) String keyword) {
+
+        // 컨트롤러가 직접 헤더에서 userId를 가져옵니다.
+        Long userId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
 
         PageRequest pageRequest = PageRequest.of(page, size);
         Page<OrderDetailResponse> response = orderService.getUserOrders(userId, pageRequest, keyword);
@@ -78,9 +82,11 @@ public class OrderController {
 
     @Operation(summary = "Get My Order Summary", description = "Retrieves order summary (total amounts, counts) for the authenticated user.")
     @GetMapping("/users/me/summary")
-    public ApiResponseDto<UserOrderSummaryDto> getMyOrderSummary(
-            @Parameter(description = "User ID from authentication", hidden = true)
-            @RequestHeader("X-Auth-UserId") Long userId) {
+    public ApiResponseDto<UserOrderSummaryDto> getMyOrderSummary() {
+
+        // 컨트롤러가 직접 헤더에서 userId를 가져옵니다.
+        Long userId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
+
         UserOrderSummaryDto response = orderService.getUserOrderSummary(userId);
         return ApiResponseDto.readOk(response);
     }
@@ -90,11 +96,13 @@ public class OrderController {
     public ApiResponseDto<OrderDetailResponse> cancelOrder(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
             @PathVariable String orderId,
-            @Parameter(description = "User ID from authentication", hidden = true)
-            @RequestHeader("X-Auth-UserId") Long userId,
             @Parameter(description = "User role from authentication", hidden = true)
             @RequestHeader("X-Auth-Role") String userRole,
             @Valid @RequestBody(required = false) OrderCancelRequest request) {
+
+        // 컨트롤러가 직접 헤더에서 userId를 가져옵니다.
+        Long userId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
+
         OrderDetailResponse response = orderService.cancelOrder(orderId, request, userId, userRole);
         return ApiResponseDto.createOk(response);
     }
@@ -113,11 +121,12 @@ public class OrderController {
     public ApiResponseDto<OrderStatusUpdateResponse> updateOrderStatus(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
             @PathVariable String orderId,
-            @Parameter(description = "User ID from authentication", hidden = true)
-            @RequestHeader("X-Auth-UserId") Long userId,
             @Parameter(description = "User role from authentication", hidden = true)
             @RequestHeader("X-Auth-Role") String userRole,
             @Valid @RequestBody OrderStatusUpdateRequest request) {
+
+        // 컨트롤러가 직접 헤더에서 userId를 가져옵니다.
+        Long userId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
 
         // Validate user has permission to update order status
         if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {

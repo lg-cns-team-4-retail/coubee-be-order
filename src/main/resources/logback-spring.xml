@@ -2,7 +2,11 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <property name="APP_NAME" value="payment-service"/>
+    <!--
+        애플리케이션 이름을 application.yml에서 동적으로 가져오도록 수정합니다.
+        (translation: Modify to dynamically source the application name from application.yml.)
+    -->
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="coubee-be-order"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>

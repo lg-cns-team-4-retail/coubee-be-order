@@ -319,9 +319,9 @@ public class PaymentServiceImpl implements PaymentService {
             payment.updateStatus(PaymentStatus.PAID);
             payment.updatePgTransactionId(transactionId);
             payment.updatePaidAt(LocalDateTime.now());
-            
-            paymentRepository.save(payment);
-            
+
+            // paymentRepository.save(payment); // Redundant call removed - managed entity changes are automatically persisted
+
             // 주문 상태 업데이트
             orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
 
@@ -331,7 +331,7 @@ public class PaymentServiceImpl implements PaymentService {
             // V3: 모든 주문 아이템의 이벤트 타입을 PURCHASE로 설정
             order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
 
-            orderRepository.save(order);
+            // orderRepository.save(order); // Redundant call removed - managed entity changes are automatically persisted
 
             // Kafka 이벤트 발행
             publishPaymentCompletedEvent(order, payment);

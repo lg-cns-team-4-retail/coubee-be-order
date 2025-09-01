@@ -9,6 +9,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,6 +30,7 @@ public class ProductStockServiceImpl implements ProductStockService {
     private final ProductClient productClient;
 
     @Override
+    @Transactional
     @CircuitBreaker(name = "productStock", fallbackMethod = "decreaseStockFallback")
     public void decreaseStock(Order order) {
         log.info("재고 감소 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
@@ -67,6 +69,7 @@ public class ProductStockServiceImpl implements ProductStockService {
     }
 
     @Override
+    @Transactional
     @CircuitBreaker(name = "productStock", fallbackMethod = "increaseStockFallback")
     public void increaseStock(Order order) {
         log.info("재고 증가 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
