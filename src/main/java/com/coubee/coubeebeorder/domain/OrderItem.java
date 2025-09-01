@@ -25,7 +25,7 @@ public class OrderItem extends BaseTimeEntity {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    @Column(name = "product_name", nullable = false)
+    @Column(name = "product_name", nullable = false, columnDefinition = "VARCHAR(255)")
     private String productName;
 
     @Column(nullable = false)
