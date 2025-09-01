@@ -48,10 +48,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     /**
      * Step 2: Fetches the full details for a given list of order IDs using fetch joins.
      * This query operates on the specific order IDs retrieved in Step 1.
+     * Includes statusHistory fetch to prevent N+1 query problem.
      */
     @Query("SELECT DISTINCT o FROM Order o " +
            "LEFT JOIN FETCH o.items " +
            "LEFT JOIN FETCH o.payment " +
+           "LEFT JOIN FETCH o.statusHistory " +
            "WHERE o.orderId IN :orderIds " +
            "ORDER BY o.createdAt DESC")
     List<Order> findWithDetailsIn(@Param("orderIds") List<String> orderIds);
