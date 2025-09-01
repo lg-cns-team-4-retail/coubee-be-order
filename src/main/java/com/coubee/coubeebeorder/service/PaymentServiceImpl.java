@@ -277,12 +277,14 @@ public class PaymentServiceImpl implements PaymentService {
         payment.updateStatus(PaymentStatus.PAID);
         payment.updatePaidStatus("test-pg", "test-pg-tid-" + orderId, "http://test.receipt.url");
 
-        // 5. 주문 상태 변경 이력 기록 (중요) (translation: 5. Record order status change history (Important))
-        orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
-
-        // 6. 데이터베이스에 저장 (translation: 6. Save to the database)
+        // 5. [FIX] 데이터베이스에 먼저 저장합니다. (translation: 5. [FIX] First, save to the database.)
+        // Cascade 설정으로 인해 Order, OrderItem, Payment가 모두 저장됩니다. (translation: Due to Cascade settings, Order, OrderItem, and Payment will all be saved.)
         orderRepository.save(order);
         log.info("Test order saved to database with orderId: {}", orderId);
+
+        // 6. [FIX] 저장된 후에 상태 변경 이력을 기록합니다. (translation: 6. [FIX] Record the status change history after saving.)
+        // 이렇게 함으로써 updateOrderStatusWithHistory가 DB에서 주문을 조회할 시점에는 이미 주문 데이터가 존재하게 되어 NotFound 예외가 발생하지 않습니다. (translation: This ensures the order data already exists when updateOrderStatusWithHistory queries the DB, preventing a NotFound exception.)
+        orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
 
         // 7. Kafka 이벤트 발행 (translation: 7. Publish Kafka event)
         publishPaymentCompletedEvent(order, payment);
