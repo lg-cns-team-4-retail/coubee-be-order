@@ -20,8 +20,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     /**
      * Native query to fetch paginated order IDs with explicit type casting to avoid lower(bytea) error
+     * Returns order_id and created_at to satisfy PostgreSQL SELECT DISTINCT / ORDER BY requirements
      */
-    @Query(value = "SELECT DISTINCT o.order_id " +
+    @Query(value = "SELECT DISTINCT o.order_id, o.created_at " +
                    "FROM coubee_order.orders o " +
                    "WHERE o.user_id = :userId " +
                    "AND (:keyword IS NULL OR EXISTS (" +
@@ -40,9 +41,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                         "    AND LOWER(CAST(oi.product_name AS VARCHAR)) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
                         "))",
            nativeQuery = true)
-    Page<String> findUserOrderIdsNative(@Param("userId") Long userId,
-                                        @Param("keyword") String keyword,
-                                        Pageable pageable);
+    Page<Object[]> findUserOrderIdsNative(@Param("userId") Long userId,
+                                          @Param("keyword") String keyword,
+                                          Pageable pageable);
 
     /**
      * Step 2: Fetches the full details for a given list of order IDs using fetch joins.

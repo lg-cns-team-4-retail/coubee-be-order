@@ -267,21 +267,26 @@ public class OrderServiceImpl implements OrderService {
     public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable, String keyword) {
         log.info("Getting user orders - userId: {}, pageable: {}, keyword: {}", userId, pageable, keyword);
 
-        // Step 1: Fetch paginated order IDs using native query with explicit type casting
-        Page<String> orderIdPage = orderRepository.findUserOrderIdsNative(userId, keyword, pageable);
+        // Step 1: Fetch paginated order data using native query with explicit type casting
+        Page<Object[]> orderDataPage = orderRepository.findUserOrderIdsNative(userId, keyword, pageable);
 
-        if (orderIdPage.isEmpty()) {
+        if (orderDataPage.isEmpty()) {
             return Page.empty(pageable);
         }
 
-        // Step 2: Fetch the full details for the order IDs using fetch joins
-        List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orderIdPage.getContent());
+        // Step 2: Extract order IDs from the Object[] results (first column is order_id)
+        List<String> orderIds = orderDataPage.getContent().stream()
+                .map(row -> (String) row[0])
+                .collect(Collectors.toList());
 
-        // Step 3: Convert the detailed entities to DTOs
+        // Step 3: Fetch the full details for the order IDs using fetch joins
+        List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orderIds);
+
+        // Step 4: Convert the detailed entities to DTOs
         List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(ordersWithDetails);
 
-        // Step 4: Create and return the final Page object with the DTOs and original pagination info
-        return new PageImpl<>(orderDetailResponses, pageable, orderIdPage.getTotalElements());
+        // Step 5: Create and return the final Page object with the DTOs and original pagination info
+        return new PageImpl<>(orderDetailResponses, pageable, orderDataPage.getTotalElements());
     }
 
     @Override
