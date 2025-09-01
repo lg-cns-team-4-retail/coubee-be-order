@@ -50,29 +50,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "WHERE o IN :orders")
     List<Order> findWithDetailsIn(@Param("orders") List<Order> orders);
 
-    /**
-     * Combined method: Fetches user orders with details and keyword filtering in one query.
-     * This method combines the functionality of findUserOrders and findWithDetailsIn.
-     */
-    @Query(value = "SELECT DISTINCT o FROM Order o " +
-                   "LEFT JOIN FETCH o.items " +
-                   "LEFT JOIN FETCH o.payment " +
-                   "WHERE o.userId = :userId " +
-                   "AND (:keyword IS NULL OR EXISTS (" +
-                   "    SELECT 1 FROM OrderItem oi " +
-                   "    WHERE oi.order = o " +
-                   "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
-                   "))",
-           countQuery = "SELECT count(o) FROM Order o " +
-                        "WHERE o.userId = :userId " +
-                        "AND (:keyword IS NULL OR EXISTS (" +
-                        "    SELECT 1 FROM OrderItem oi " +
-                        "    WHERE oi.order = o " +
-                        "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
-                        "))")
-    Page<Order> findUserOrdersWithDetailsAndKeyword(@Param("userId") Long userId,
-                                                    @Param("keyword") String keyword,
-                                                    Pageable pageable);
 
     /**
      * V3: 결제 완료 시점 범위로 주문 조회
