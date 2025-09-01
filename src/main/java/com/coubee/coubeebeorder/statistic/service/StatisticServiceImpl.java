@@ -145,7 +145,7 @@ public class StatisticServiceImpl implements StatisticService {
 
     @Override
     public List<ProductSalesSummaryDto> getProductSalesSummary(Long storeId, LocalDate startDate, LocalDate endDate, Long userId) {
-        log.info("Getting product sales summary for storeId: {}, startDate: {}, endDate: {}, userId: {}",
+        log.info("Getting product sales summary with hotdeal data for storeId: {}, startDate: {}, endDate: {}, userId: {}",
                 storeId, startDate, endDate, userId);
 
         // Validate store access
@@ -156,21 +156,25 @@ public class StatisticServiceImpl implements StatisticService {
             long startUnix = startDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
             long endUnix = endDate.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
 
-            // Get product sales summary from repository
-            List<OrderRepository.ProductSalesSummaryProjection> projections =
-                orderRepository.findProductSalesSummaryByStore(storeId, startUnix, endUnix);
+            // 핫딜 데이터가 포함된 새로운 쿼리 메소드를 호출합니다. (translation: Call the new query method that includes Hotdeal data.)
+            List<OrderRepository.SoldItemsSummaryProjection> projections =
+                orderRepository.getSoldItemsSummaryWithHotdeal(startUnix, endUnix, storeId);
 
-            // Convert projections to DTOs
+            // 수정된 DTO에 맞게 프로젝션 결과를 매핑합니다. (translation: Map the projection results to the modified DTO.)
             List<ProductSalesSummaryDto> result = projections.stream()
                 .map(projection -> ProductSalesSummaryDto.builder()
                     .productId(projection.getProductId())
                     .productName(projection.getProductName())
-                    .quantitySold(projection.getQuantitySold())
-                    .totalSalesAmount(projection.getTotalSalesAmount())
+                    .totalQuantitySold(projection.getTotalQuantity())
+                    .totalSalesAmount(projection.getTotalRevenue())
+                    .hotdealQuantitySold(projection.getHotdealQuantity())
+                    .hotdealSalesAmount(projection.getHotdealRevenue())
+                    .regularQuantitySold(projection.getRegularQuantity())
+                    .regularSalesAmount(projection.getRegularRevenue())
                     .build())
                 .collect(Collectors.toList());
 
-            log.info("Successfully retrieved product sales summary for storeId: {}, found {} products",
+            log.info("Successfully retrieved product sales summary with hotdeal data for storeId: {}, found {} products",
                     storeId, result.size());
             return result;
         } catch (Exception e) {
