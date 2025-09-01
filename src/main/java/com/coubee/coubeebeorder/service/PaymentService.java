@@ -20,9 +20,8 @@ public interface PaymentService {
     /**
      * Creates a test order, marks it as completed, and publishes a Kafka event.
      *
-     * @param userId The ID of the user for whom to create the test order.
-     * @param storeId The ID of the store for the test order.
+     * @param request The request containing userId, storeId, productId, and quantity.
      * @return The orderId of the newly created test order.
      */
-    String createAndCompleteTestOrder(Long userId, Long storeId);
+    String createAndCompleteTestOrder(com.coubee.coubeebeorder.domain.dto.TestOrderCreateRequest request);
 }

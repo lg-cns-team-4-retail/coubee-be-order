@@ -19,6 +19,8 @@ import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificat
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
 import com.coubee.coubeebeorder.remote.store.StoreResponseDto;
+import com.coubee.coubeebeorder.remote.product.ProductClient;
+import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import com.coubee.coubeebeorder.util.PortOneWebhookVerifier;
 import com.coubee.coubeebeorder.domain.ProcessedWebhook;
 import com.coubee.coubeebeorder.domain.repository.ProcessedWebhookRepository;
@@ -53,6 +55,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final ObjectMapper objectMapper;
     private final PaymentClient portonePaymentClient;
     private final StoreClient storeClient;
+    private final ProductClient productClient;
 
     @Override
     @Transactional
@@ -243,39 +246,45 @@ public class PaymentServiceImpl implements PaymentService {
      */
     @Override
     @Transactional
-    public String createAndCompleteTestOrder(Long userId, Long storeId) {
-        log.info("Creating and force-completing test order for userId: {}, storeId: {}", userId, storeId);
+    public String createAndCompleteTestOrder(com.coubee.coubeebeorder.domain.dto.TestOrderCreateRequest request) {
+        log.info("Creating and force-completing test order for request: {}", request);
 
-        // 1. Create test Order and OrderItem data
-        String orderId = "test_order_" + UUID.randomUUID().toString().replace("-", "");
-        int totalAmount = 15000; // Example amount
+        // 1. Product Service에서 실제 상품 정보 조회 (가격을 가져오기 위함) (translation: 1. Fetch actual product information from Product Service (to get the price))
+        com.coubee.coubeebeorder.common.dto.ApiResponseDto<com.coubee.coubeebeorder.remote.product.ProductResponseDto> productResponse = productClient.getProductById(request.getProductId(), request.getUserId());
+        if (productResponse == null || productResponse.getData() == null) {
+            throw new com.coubee.coubeebeorder.common.exception.NotFound("Test failed: Product not found with ID: " + request.getProductId());
+        }
+        com.coubee.coubeebeorder.remote.product.ProductResponseDto product = productResponse.getData();
+
+        // 2. 조회한 상품 정보로 주문 데이터 생성 (translation: 2. Create order data with the fetched product information)
+        String orderId = "test_order_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        int totalAmount = product.getSalePrice() * request.getQuantity(); // 실제 상품 가격으로 총액 계산 (translation: Calculate total amount with the actual product price)
         String recipientName = "Test User";
 
-        Order order = Order.createOrder(orderId, userId, storeId, totalAmount, recipientName);
-        OrderItem item = OrderItem.createOrderItem(99L, "Test Product", 1, totalAmount);
+        Order order = Order.createOrder(orderId, request.getUserId(), request.getStoreId(), totalAmount, recipientName);
+        OrderItem item = OrderItem.createOrderItem(product.getProductId(), product.getProductName(), request.getQuantity(), product.getSalePrice());
         order.addOrderItem(item);
 
-        // 2. Create test Payment data
+        // 3. 결제 데이터 생성 (translation: 3. Create payment data)
         Payment payment = Payment.createPayment(orderId, order, "CARD", totalAmount);
         order.setPayment(payment);
 
-        // 3. Forcefully update status to PAID
+        // 4. 주문 및 결제 상태를 강제로 'PAID'로 변경 (translation: 4. Forcefully update order and payment status to 'PAID')
         order.updateStatus(OrderStatus.PAID);
-        order.markAsPaidNow(); // Set paid_at_unix timestamp
+        order.markAsPaidNow();
         order.getItems().forEach(orderItem -> orderItem.updateEventType(EventType.PURCHASE));
 
         payment.updateStatus(PaymentStatus.PAID);
         payment.updatePaidStatus("test-pg", "test-pg-tid-" + orderId, "http://test.receipt.url");
 
-        // This is crucial for recording the OrderTimestamp history
+        // 5. 주문 상태 변경 이력 기록 (중요) (translation: 5. Record order status change history (Important))
         orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
 
-        // 4. Save everything to the database
-        // The Order entity has CascadeType.ALL, so this saves Order, OrderItem, Payment, and OrderTimestamp
+        // 6. 데이터베이스에 저장 (translation: 6. Save to the database)
         orderRepository.save(order);
         log.info("Test order saved to database with orderId: {}", orderId);
 
-        // 5. Publish the Kafka event
+        // 7. Kafka 이벤트 발행 (translation: 7. Publish Kafka event)
         publishPaymentCompletedEvent(order, payment);
 
         return orderId;

@@ -74,30 +74,26 @@ public class PaymentController {
     }
 
     @PostMapping("/test/payment-completed")
-    @Operation(summary = "결제 완료 이벤트 테스트", description = "결제 완료 알림 이벤트 발행을 테스트합니다.")
+    @Operation(summary = "결제 완료 이벤트 테스트 (주문 자동 생성) (translation: Payment Completed Event Test (Auto-creates order))", description = "요청된 상품 정보로 주문을 자동 생성하고, 결제 완료 상태로 만든 후 알림 이벤트를 발행합니다. (translation: Automatically creates an order with the requested product info, sets it to 'completed payment' status, and then publishes a notification event.)")
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> testPaymentCompletedEvent(
-            @Parameter(description = "사용자 ID", example = "1")
-            @RequestParam Long userId,
-            @Parameter(description = "매장 ID", example = "1")
-            @RequestParam Long storeId) {
+            @jakarta.validation.Valid @RequestBody com.coubee.coubeebeorder.domain.dto.TestOrderCreateRequest request) { // @RequestParam -> @RequestBody로 변경 (translation: Changed from @RequestParam to @RequestBody)
 
-        log.info("Payment completed event test requested - User ID: {}, Store ID: {}", userId, storeId);
+        log.info("Payment completed event test requested - Request: {}", request);
 
         try {
-            // Create and complete test order using the new service method
-            String testOrderId = paymentService.createAndCompleteTestOrder(userId, storeId);
+            // 수정된 서비스 메소드 호출 (translation: Call the modified service method)
+            String testOrderId = paymentService.createAndCompleteTestOrder(request);
 
-            // Update the response message
             Map<String, Object> result = Map.of(
                 "orderId", testOrderId,
-                "userId", userId,
-                "storeId", storeId,
+                "userId", request.getUserId(),
+                "storeId", request.getStoreId(),
+                "productId", request.getProductId(),
                 "message", "Test order created and payment completion event has been published.",
                 "timestamp", java.time.LocalDateTime.now().toString()
             );
 
             log.info("Payment completed event test finished - Created Order ID: {}", testOrderId);
-
             return ResponseEntity.ok(ApiResponseDto.createOk(result));
 
         } catch (Exception e) {
