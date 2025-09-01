@@ -19,37 +19,41 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderId(String orderId);
 
     /**
-     * [MODIFIED] Step 1: Fetches a paginated list of Order IDs that match the criteria.
-     * This query is simple and contains no fetch joins, allowing the database to perform efficient pagination.
+     * Native query to fetch paginated order IDs with explicit type casting to avoid lower(bytea) error
      */
-    @Query(value = "SELECT o FROM Order o " +
-                   "WHERE o.userId = :userId " +
+    @Query(value = "SELECT DISTINCT o.order_id " +
+                   "FROM coubee_order.orders o " +
+                   "WHERE o.user_id = :userId " +
                    "AND (:keyword IS NULL OR EXISTS (" +
-                   "    SELECT 1 FROM OrderItem oi " +
-                   "    WHERE oi.order = o " +
-                   "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
-                   "))",
-           countQuery = "SELECT count(o) FROM Order o " +
-                        "WHERE o.userId = :userId " +
+                   "    SELECT 1 FROM coubee_order.order_items oi " +
+                   "    WHERE oi.order_id = o.order_id " +
+                   "    AND LOWER(CAST(oi.product_name AS VARCHAR)) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                   ")) " +
+                   "ORDER BY o.created_at DESC " +
+                   "LIMIT :#{#pageable.pageSize} OFFSET :#{#pageable.offset}",
+           countQuery = "SELECT COUNT(DISTINCT o.order_id) " +
+                        "FROM coubee_order.orders o " +
+                        "WHERE o.user_id = :userId " +
                         "AND (:keyword IS NULL OR EXISTS (" +
-                        "    SELECT 1 FROM OrderItem oi " +
-                        "    WHERE oi.order = o " +
-                        "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
-                        "))")
-    Page<Order> findUserOrders(@Param("userId") Long userId,
-                               @Param("keyword") String keyword,
-                               Pageable pageable);
+                        "    SELECT 1 FROM coubee_order.order_items oi " +
+                        "    WHERE oi.order_id = o.order_id " +
+                        "    AND LOWER(CAST(oi.product_name AS VARCHAR)) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                        "))",
+           nativeQuery = true)
+    Page<String> findUserOrderIdsNative(@Param("userId") Long userId,
+                                        @Param("keyword") String keyword,
+                                        Pageable pageable);
 
     /**
-     * [NEW] Step 2: Fetches the full details for a given list of Orders using fetch joins.
-     * This query operates on the specific IDs retrieved in Step 1.
+     * Step 2: Fetches the full details for a given list of order IDs using fetch joins.
+     * This query operates on the specific order IDs retrieved in Step 1.
      */
     @Query("SELECT DISTINCT o FROM Order o " +
            "LEFT JOIN FETCH o.items " +
            "LEFT JOIN FETCH o.payment " +
-           "WHERE o IN :orders")
-    List<Order> findWithDetailsIn(@Param("orders") List<Order> orders);
-
+           "WHERE o.orderId IN :orderIds " +
+           "ORDER BY o.createdAt DESC")
+    List<Order> findWithDetailsIn(@Param("orderIds") List<String> orderIds);
 
     /**
      * V3: 결제 완료 시점 범위로 주문 조회
