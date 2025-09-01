@@ -21,7 +21,7 @@ public interface OrderService {
 
     OrderStatusResponse getOrderStatus(String orderId);
 
-    Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable);
+    Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable, String keyword);
 
     OrderDetailResponse cancelOrder(String orderId, OrderCancelRequest request, Long userId, String userRole);
 

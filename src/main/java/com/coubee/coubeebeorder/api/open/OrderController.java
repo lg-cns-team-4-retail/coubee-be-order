@@ -59,7 +59,7 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get My Orders", description = "Retrieves detailed order list for authenticated user")
+    @Operation(summary = "Get My Orders", description = "Retrieves detailed order list for authenticated user. Can be filtered by keyword.")
     @GetMapping("/users/me/orders")
     public ApiResponseDto<Page<OrderDetailResponse>> getMyOrders(
             @Parameter(description = "User ID from authentication", hidden = true)
@@ -67,10 +67,12 @@ public class OrderController {
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
-        // Sort는 OrderService에서 처리하므로 여기서는 제거
+            @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Search keyword for product name", example = "bacon")
+            @RequestParam(required = false) String keyword) {
+
         PageRequest pageRequest = PageRequest.of(page, size);
-        Page<OrderDetailResponse> response = orderService.getUserOrders(userId, pageRequest);
+        Page<OrderDetailResponse> response = orderService.getUserOrders(userId, pageRequest, keyword);
         return ApiResponseDto.readOk(response);
     }
 

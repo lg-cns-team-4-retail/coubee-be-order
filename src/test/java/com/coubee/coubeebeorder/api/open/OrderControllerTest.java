@@ -123,7 +123,7 @@ class OrderControllerTest {
         List<OrderDetailResponse> orders = List.of(orderDetail);
         Page<OrderDetailResponse> orderPage = new PageImpl<>(orders, PageRequest.of(0, 10), 1);
 
-        given(orderService.getUserOrders(eq(userId), any(PageRequest.class))).willReturn(orderPage);
+        given(orderService.getUserOrders(eq(userId), any(PageRequest.class), any())).willReturn(orderPage);
 
         // When & Then
         mockMvc.perform(get("/api/order/users/me/orders")

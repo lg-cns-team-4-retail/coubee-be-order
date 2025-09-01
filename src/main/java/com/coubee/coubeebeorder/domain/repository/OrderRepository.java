@@ -18,21 +18,34 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByOrderId(String orderId);
 
-    Page<Order> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
-
     /**
-     * Find orders with detailed information (items and payment) by user ID
-     * Uses fetch join to avoid N+1 problem when loading order details
+     * Finds a paginated list of orders for a user, with optional keyword filtering on product names.
+     * It uses fetch joins to prevent N+1 problems.
      *
-     * @param userId user ID
-     * @param pageable pagination information
-     * @return page of orders with items and payment details loaded
+     * @param userId The user's ID.
+     * @param keyword The search term to filter by product name (case-insensitive).
+     * @param pageable Pagination information.
+     * @return A Page of Order entities with related items and payment info eagerly loaded.
      */
-    @Query("SELECT DISTINCT o FROM Order o " +
-           "LEFT JOIN FETCH o.items " +
-           "LEFT JOIN FETCH o.payment " +
-           "WHERE o IN :orders")
-    List<Order> findWithDetailsIn(@Param("orders") List<Order> orders);
+    @Query(value = "SELECT DISTINCT o FROM Order o " +
+                   "LEFT JOIN FETCH o.items " +
+                   "LEFT JOIN FETCH o.payment " +
+                   "WHERE o.userId = :userId " +
+                   "AND (:keyword IS NULL OR EXISTS (" +
+                   "    SELECT 1 FROM OrderItem oi " +
+                   "    WHERE oi.order = o " +
+                   "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                   "))",
+           countQuery = "SELECT count(DISTINCT o) FROM Order o " +
+                        "WHERE o.userId = :userId " +
+                        "AND (:keyword IS NULL OR EXISTS (" +
+                        "    SELECT 1 FROM OrderItem oi " +
+                        "    WHERE oi.order = o " +
+                        "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                        "))")
+    Page<Order> findUserOrdersWithDetailsAndKeyword(@Param("userId") Long userId,
+                                                    @Param("keyword") String keyword,
+                                                    Pageable pageable);
 
     /**
      * V3: 결제 완료 시점 범위로 주문 조회

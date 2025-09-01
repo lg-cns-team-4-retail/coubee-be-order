@@ -264,51 +264,21 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable) {
-        log.info("getUserOrders 호출 - userId: {}, pageable: {}", userId, pageable);
-        
-        // 1. 기본 정렬된 주문 조회
-        Page<Order> orderPage = orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
-        List<Order> orders = orderPage.getContent();
-        
-        log.info("1단계 - 정렬된 주문 조회 완료. 총 {}개 주문", orders.size());
-        orders.forEach(order -> log.debug("정렬된 주문: orderId={}, createdAt={}", 
-                order.getOrderId(), order.getCreatedAt()));
+    public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable, String keyword) {
+        log.info("Getting user orders - userId: {}, pageable: {}, keyword: {}", userId, pageable, keyword);
 
-        if (orders.isEmpty()) {
+        // 1. Fetch the paginated and filtered list of Orders using the new repository method.
+        Page<Order> orderPage = orderRepository.findUserOrdersWithDetailsAndKeyword(userId, keyword, pageable);
+
+        if (orderPage.isEmpty()) {
             return Page.empty(pageable);
         }
 
-        // 2. 상세 정보 포함 조회
-        List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orders);
-        
-        log.info("2단계 - 상세 정보 조회 완료. 총 {}개 주문", ordersWithDetails.size());
-        ordersWithDetails.forEach(order -> log.debug("상세 조회 후: orderId={}, createdAt={}", 
-                order.getOrderId(), order.getCreatedAt()));
+        // 2. Convert the list of entities to a list of DTOs, using bulk fetching for external service data.
+        List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(orderPage.getContent());
 
-        // 3. 순서 보장을 위해 재정렬
-        java.util.Map<Long, Order> orderMap = ordersWithDetails.stream()
-                .collect(java.util.stream.Collectors.toMap(Order::getId, order -> order));
-
-        List<Order> reorderedOrders = orders.stream()
-                .map(order -> orderMap.get(order.getId()))
-                .collect(java.util.stream.Collectors.toList());
-                
-        log.info("3단계 - 재정렬 완료. 총 {}개 주문", reorderedOrders.size());
-        reorderedOrders.forEach(order -> log.debug("재정렬 후: orderId={}, createdAt={}", 
-                order.getOrderId(), order.getCreatedAt()));
-
-        // 4. 벌크 DTO 변환 (N+1 문제 해결)
-        List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(reorderedOrders);
-
-        // 5. 최종 Page 객체 생성
-        Page<OrderDetailResponse> result = new PageImpl<>(orderDetailResponses, pageable, orderPage.getTotalElements());
-
-        log.info("최종 결과 - 총 {}개 주문 반환", result.getContent().size());
-        result.getContent().forEach(orderResponse -> log.debug("최종 응답: orderId={}, createdAt={}",
-                orderResponse.getOrderId(), orderResponse.getCreatedAt()));
-
-        return result;
+        // 3. Create and return the final Page object.
+        return new PageImpl<>(orderDetailResponses, pageable, orderPage.getTotalElements());
     }
 
     @Override

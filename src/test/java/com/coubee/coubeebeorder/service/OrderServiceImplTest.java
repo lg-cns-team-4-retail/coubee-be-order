@@ -181,7 +181,7 @@ class OrderServiceImplTest {
         given(productClient.getProductById(anyLong(), anyLong())).willReturn(com.coubee.coubeebeorder.common.dto.ApiResponseDto.ok(new com.coubee.coubeebeorder.remote.product.ProductResponseDto()));
 
         // When
-        Page<OrderDetailResponse> result = orderService.getUserOrders(userId, pageRequest);
+        Page<OrderDetailResponse> result = orderService.getUserOrders(userId, pageRequest, null);
 
         // Then
         assertThat(result).isNotNull();
