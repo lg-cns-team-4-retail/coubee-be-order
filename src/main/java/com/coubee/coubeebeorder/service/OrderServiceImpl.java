@@ -267,17 +267,20 @@ public class OrderServiceImpl implements OrderService {
     public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable, String keyword) {
         log.info("Getting user orders - userId: {}, pageable: {}, keyword: {}", userId, pageable, keyword);
 
-        // 1. Fetch the paginated and filtered list of Orders using the new repository method.
-        Page<Order> orderPage = orderRepository.findUserOrdersWithDetailsAndKeyword(userId, keyword, pageable);
+        // Step 1: Fetch the paginated page of Order entities (without collections).
+        Page<Order> orderPage = orderRepository.findUserOrders(userId, keyword, pageable);
 
         if (orderPage.isEmpty()) {
             return Page.empty(pageable);
         }
 
-        // 2. Convert the list of entities to a list of DTOs, using bulk fetching for external service data.
-        List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(orderPage.getContent());
+        // Step 2: Fetch the full details for the content of the current page using a fetch join.
+        List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orderPage.getContent());
 
-        // 3. Create and return the final Page object.
+        // Step 3: Convert the detailed entities to DTOs (this method already exists and is correct).
+        List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(ordersWithDetails);
+
+        // Step 4: Create and return the final Page object with the DTOs and original pagination info.
         return new PageImpl<>(orderDetailResponses, pageable, orderPage.getTotalElements());
     }
 
