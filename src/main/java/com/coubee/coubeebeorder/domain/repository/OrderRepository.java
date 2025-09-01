@@ -34,14 +34,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                    "AND (:keyword IS NULL OR EXISTS (" +
                    "    SELECT 1 FROM OrderItem oi " +
                    "    WHERE oi.order = o " +
-                   "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                   "    AND LOWER(CAST(oi.productName AS text)) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
                    "))",
            countQuery = "SELECT count(DISTINCT o) FROM Order o " +
                         "WHERE o.userId = :userId " +
                         "AND (:keyword IS NULL OR EXISTS (" +
                         "    SELECT 1 FROM OrderItem oi " +
                         "    WHERE oi.order = o " +
-                        "    AND LOWER(oi.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                        "    AND LOWER(CAST(oi.productName AS text)) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
                         "))")
     Page<Order> findUserOrdersWithDetailsAndKeyword(@Param("userId") Long userId,
                                                     @Param("keyword") String keyword,
