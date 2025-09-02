@@ -653,7 +653,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         WHERE o.store_id IN :storeIds
         AND o.status IN ('PAID', 'RECEIVED')
         GROUP BY oi.product_id
-        ORDER BY totalQuantity DESC
+        ORDER BY SUM(oi.quantity) DESC
         """, 
         countQuery = """
         SELECT COUNT(DISTINCT oi.product_id)
