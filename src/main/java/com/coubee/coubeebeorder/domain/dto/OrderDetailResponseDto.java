@@ -1,5 +1,6 @@
 package com.coubee.coubeebeorder.domain.dto;
 
+import com.coubee.coubeebeorder.remote.user.SiteUserInfoDto;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -47,7 +48,7 @@ public class OrderDetailResponseDto {
     private PaymentInfo payment;
 
     @Schema(description = "Customer information")
-    private OrderCustomerInfoDto customerInfo;
+    private SiteUserInfoDto customerInfo;
 
     /**
      * 상점 정보 내부 클래스

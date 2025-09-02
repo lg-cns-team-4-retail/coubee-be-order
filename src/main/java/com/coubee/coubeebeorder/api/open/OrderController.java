@@ -12,7 +12,6 @@ import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderDetailResponseDto;
-import com.coubee.coubeebeorder.domain.dto.OrderCustomerInfoDto;
 import com.coubee.coubeebeorder.domain.dto.StoreOrderSummaryResponseDto;
 import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
 import com.coubee.coubeebeorder.service.OrderService;
@@ -226,13 +225,9 @@ public class OrderController {
         // (Fetch the user information using the OpenFeign client.)
         ApiResponseDto<SiteUserInfoDto> userResponse = userServiceClient.getUserInfoById(orderDetail.getUserId());
 
-        // 응답받은 SiteUserInfoDto를 OrderCustomerInfoDto로 매핑합니다.
-        // (Maps the received SiteUserInfoDto to an OrderCustomerInfoDto.)
-        OrderCustomerInfoDto customerInfo = mapToCustomerInfo(userResponse.getData());
-
-        // OrderDetailResponse를 OrderDetailResponseDto로 변환합니다.
-        // (Converts OrderDetailResponse to OrderDetailResponseDto.)
-        OrderDetailResponseDto responseDto = convertToOrderDetailResponseDto(orderDetail, customerInfo);
+        // User 서비스로부터 받은 SiteUserInfoDto를 직접 사용하여 DTO를 변환합니다.
+        // (Directly use the SiteUserInfoDto received from the User service to convert the DTO.)
+        OrderDetailResponseDto responseDto = convertToOrderDetailResponseDto(orderDetail, userResponse.getData());
 
         return ApiResponseDto.<OrderDetailResponseDto>builder()
                 .code("OK")
@@ -246,7 +241,7 @@ public class OrderController {
      * OrderDetailResponse를 OrderDetailResponseDto로 변환하는 헬퍼 메서드
      * (Helper method to convert OrderDetailResponse to OrderDetailResponseDto)
      */
-    private OrderDetailResponseDto convertToOrderDetailResponseDto(OrderDetailResponse orderDetail, OrderCustomerInfoDto customerInfo) {
+    private OrderDetailResponseDto convertToOrderDetailResponseDto(OrderDetailResponse orderDetail, SiteUserInfoDto customerInfo) {
         // 상점 정보를 변환합니다.
         // (Converts store information.)
         OrderDetailResponseDto.StoreInfo storeInfo = OrderDetailResponseDto.StoreInfo.builder()
@@ -290,23 +285,4 @@ public class OrderController {
                 .build();
     }
 
-    /**
-     * SiteUserInfoDto를 OrderCustomerInfoDto로 매핑하는 헬퍼 메서드
-     * (Helper method to map SiteUserInfoDto to OrderCustomerInfoDto)
-     */
-    private OrderCustomerInfoDto mapToCustomerInfo(SiteUserInfoDto siteUserInfo) {
-        if (siteUserInfo == null) {
-            return null;
-        }
-        
-        // SiteUserInfoDto의 필드를 OrderCustomerInfoDto로 매핑합니다.
-        // (Maps the fields from SiteUserInfoDto to OrderCustomerInfoDto.)
-        return OrderCustomerInfoDto.builder()
-                .username(siteUserInfo.getUsername())
-                .nickname(siteUserInfo.getNickname())
-                .name(siteUserInfo.getName())
-                .email(siteUserInfo.getEmail())
-                .phoneNum(siteUserInfo.getPhoneNum())
-                .build();
-    }
 }
