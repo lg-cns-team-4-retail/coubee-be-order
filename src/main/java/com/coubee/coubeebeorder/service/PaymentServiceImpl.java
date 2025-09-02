@@ -364,10 +364,7 @@ public class PaymentServiceImpl implements PaymentService {
             ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
             String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장";
 
-            // TODO: StoreResponseDto needs to be extended with ownerId field to properly implement bidirectional notifications
-            // For now, we'll log this limitation and send notifications to customer only
-            log.warn("StoreResponseDto doesn't contain ownerId field. Cannot send notification to store owner for storeId: {}", order.getStoreId());
-            log.info("Bidirectional notification implementation requires StoreResponseDto.ownerId field to be added by store-service team");
+            // Send payment completion notification to customer only
 
             // 2. 고객에게 보낼 '결제 완료' 알림 (translation: 2. "Payment Completed" notification for the customer)
             OrderNotificationEvent forCustomer = OrderNotificationEvent.createPaidNotification(

@@ -430,10 +430,7 @@ public class OrderServiceImpl implements OrderService {
             if (cancelStatus == OrderStatus.CANCELLED_USER) {
                 // 고객이 취소한 경우 (translation: When the customer cancels)
 
-                // TODO: StoreResponseDto needs to be extended with ownerId field to properly implement bidirectional notifications
-                // For now, we'll log this limitation and send notifications to customer only
-                log.warn("StoreResponseDto doesn't contain ownerId field. Cannot send notification to store owner for storeId: {}", order.getStoreId());
-                log.info("Bidirectional notification implementation requires StoreResponseDto.ownerId field to be added by store-service team");
+                // Send cancellation notification to customer only
 
                 // 2. 고객에게 보낼 '취소 완료' 알림 (translation: 2. "Cancellation Confirmed" notification for the customer)
                 OrderNotificationEvent forCustomer = OrderNotificationEvent.createCancelledUserNotification(
