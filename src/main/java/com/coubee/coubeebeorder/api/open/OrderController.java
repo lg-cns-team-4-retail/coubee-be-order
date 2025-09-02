@@ -11,9 +11,11 @@ import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
+import com.coubee.coubeebeorder.domain.dto.OrderDetailResponseDto;
 import com.coubee.coubeebeorder.domain.dto.StoreOrderSummaryResponseDto;
 import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
 import com.coubee.coubeebeorder.service.OrderService;
+import com.coubee.coubeebeorder.service.StoreSecurityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Tag(name = "Order API", description = "APIs for creating, retrieving, and cancelling orders")
 @RestController
@@ -34,6 +37,7 @@ import java.time.LocalDate;
 public class OrderController {
 
     private final OrderService orderService;
+    private final StoreSecurityService storeSecurityService;
 
     @Operation(summary = "Create Order", description = "Creates a new order and prepares payment")
     @PostMapping("/orders")
@@ -184,5 +188,92 @@ public class OrderController {
 
         Page<OrderDetailResponse> response = orderService.getStoreOrders(ownerUserId, storeId, status, pageRequest);
         return ApiResponseDto.readOk(response);
+    }
+
+    @Operation(summary = "Get Store Order Details", description = "Retrieves detailed information of a specific order for authenticated store owner")
+    @GetMapping("/stores/{storeId}/orders/{orderId}")
+    public ApiResponseDto<OrderDetailResponseDto> getStoreOrderDetails(
+            @Parameter(description = "Store ID", required = true, example = "1037")
+            @PathVariable Long storeId,
+            @Parameter(description = "Order ID", required = true, example = "order_4aa75a911e78481c8195290208db1fc0")
+            @PathVariable String orderId) {
+
+        // 현재 인증된 사용자의 ID를 헤더에서 가져옵니다.
+        // (Retrieves the currently authenticated user's ID from the header.)
+        Long authenticatedUserId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
+
+        // 요청을 보낸 사용자가 상점의 소유자인지 확인합니다.
+        // (Validates if the requesting user is the owner of the store.)
+        storeSecurityService.validateStoreOwner(authenticatedUserId, storeId);
+
+        // 주문 ID를 사용하여 주문을 조회합니다.
+        // (Fetches the order using the order ID.)
+        OrderDetailResponse orderDetail = orderService.getOrder(orderId);
+
+        // 조회된 주문이 해당 상점에 속하는지 확인합니다.
+        // (Verifies that the fetched order belongs to the specified store.)
+        if (!orderDetail.getStoreId().equals(storeId)) {
+            // 주문이 해당 상점에 속하지 않으면 404 에러를 발생시킵니다.
+            // (If the order does not belong to the store, treat it as not found.)
+            throw new IllegalArgumentException("Order not found for this store");
+        }
+
+        // OrderDetailResponse를 OrderDetailResponseDto로 변환합니다.
+        // (Converts OrderDetailResponse to OrderDetailResponseDto.)
+        OrderDetailResponseDto responseDto = convertToOrderDetailResponseDto(orderDetail);
+
+        return ApiResponseDto.<OrderDetailResponseDto>builder()
+                .code("OK")
+                .message("Order details retrieved successfully.")
+                .data(responseDto)
+                .success(true)
+                .build();
+    }
+
+    /**
+     * OrderDetailResponse를 OrderDetailResponseDto로 변환하는 헬퍼 메서드
+     * (Helper method to convert OrderDetailResponse to OrderDetailResponseDto)
+     */
+    private OrderDetailResponseDto convertToOrderDetailResponseDto(OrderDetailResponse orderDetail) {
+        // 상점 정보를 변환합니다.
+        // (Converts store information.)
+        OrderDetailResponseDto.StoreInfo storeInfo = OrderDetailResponseDto.StoreInfo.builder()
+                .storeId(orderDetail.getStore().getStoreId())
+                .storeName(orderDetail.getStore().getStoreName())
+                .build();
+
+        // 주문 상품 목록을 변환합니다.
+        // (Converts order items list.)
+        List<OrderDetailResponseDto.OrderItemInfo> items = orderDetail.getItems().stream()
+                .map(item -> OrderDetailResponseDto.OrderItemInfo.builder()
+                        .productName(item.getProductName())
+                        .quantity(item.getQuantity())
+                        .totalPrice(item.getTotalPrice())
+                        .build())
+                .toList();
+
+        // 결제 정보를 변환합니다.
+        // (Converts payment information.)
+        OrderDetailResponseDto.PaymentInfo paymentInfo = null;
+        if (orderDetail.getPayment() != null) {
+            paymentInfo = OrderDetailResponseDto.PaymentInfo.builder()
+                    .method(orderDetail.getPayment().getMethod())
+                    .status(orderDetail.getPayment().getStatus())
+                    .paidAt(orderDetail.getPayment().getPaidAt())
+                    .build();
+        }
+
+        // 최종 응답 DTO를 구성합니다.
+        // (Builds the final response DTO.)
+        return OrderDetailResponseDto.builder()
+                .orderId(orderDetail.getOrderId())
+                .status(orderDetail.getStatus().name())
+                .totalAmount(orderDetail.getTotalAmount())
+                .recipientName(orderDetail.getRecipientName())
+                .createdAt(orderDetail.getCreatedAt())
+                .store(storeInfo)
+                .items(items)
+                .payment(paymentInfo)
+                .build();
     }
 }
