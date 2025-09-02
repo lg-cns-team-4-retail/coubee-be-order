@@ -78,7 +78,7 @@ public interface ProductClient {
      * @param productIds 조회할 상품 ID 목록
      * @return 상품 ID를 키로 하는 ProductResponseDto 맵을 포함한 ApiResponseDto
      */
-    @GetMapping("/api/product/bulk")
+    @GetMapping("/backend/product/bulk")
     ApiResponseDto<Map<Long, ProductResponseDto>> getProductsByIdsPublic(
             @RequestParam("productIds") List<Long> productIds
     );
