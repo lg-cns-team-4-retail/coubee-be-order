@@ -65,12 +65,12 @@ resilience4j:
 #     channel-key: ${PORTONE_CHANNEL_KEY:test_channel}
 #     webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_webhook}
 
-# Enable management endpoints for Kubernetes health checks
+# Enable management endpoints for Kubernetes health checks and Prometheus
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics,prometheus # Ensure 'prometheus' is in this list
       base-path: /api
   endpoint:
     health:
@@ -82,6 +82,11 @@ management:
           include: livenessState
         readiness:
           include: readinessState
+  # Add the prometheus configuration block
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   health:
     livenessstate:
       enabled: true

@@ -20,6 +20,8 @@ import com.coubee.coubeebeorder.remote.user.UserServiceClient;
 import com.coubee.coubeebeorder.remote.user.SiteUserInfoDto;
 import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import com.coubee.coubeebeorder.domain.dto.BestsellerProductResponseDto;
+import io.micrometer.core.annotation.Counted;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -47,6 +49,9 @@ public class OrderController {
     @Operation(summary = "Create Order", description = "Creates a new order and prepares payment")
     @PostMapping("/orders")
     @ResponseStatus(HttpStatus.CREATED)
+    // Add these two annotations
+    @Timed(value = "order.creation.time", description = "Time taken to create an order")
+    @Counted(value = "order.creation.count", description = "Number of orders created")
     public ApiResponseDto<OrderCreateResponse> createOrder(
             @Valid @RequestBody OrderCreateRequest request) {
 
