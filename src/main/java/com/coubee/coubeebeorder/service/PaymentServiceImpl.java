@@ -428,7 +428,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (order.getItems() == null || order.getItems().isEmpty()) {
             return "주문 상품 없음";
         }
-        OrderItem firstItem = order.getItems().get(0);
+        OrderItem firstItem = order.getItems().iterator().next();
         if (order.getItems().size() == 1) {
             return firstItem.getProductName();
         } else {
