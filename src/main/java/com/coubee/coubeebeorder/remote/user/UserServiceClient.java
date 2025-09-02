@@ -25,4 +25,17 @@ public interface UserServiceClient {
      */
     @GetMapping("/backend/user/user/{userId}")
     ApiResponseDto<SiteUserInfoDto> getUserInfo(@PathVariable("userId") Long userId);
+
+    /**
+     * [새로 추가된 메서드]
+     * 사용자 ID(Long)로 사용자 정보를 조회합니다.
+     * User 서비스의 '/backend/user/info/{userId}' 엔드포인트를 호출합니다.
+     * ( [NEW] Retrieve user information by user ID (Long).
+     * Calls the '/backend/user/info/{userId}' endpoint in the User service.)
+     * @param userId 조회할 사용자의 ID (Long)
+     * @return SiteUserInfoDto를 포함한 ApiResponseDto
+     */
+    @GetMapping("/backend/user/info/{userId}")
+    ApiResponseDto<SiteUserInfoDto> getUserInfoById(@PathVariable("userId") Long userId);
+
 }

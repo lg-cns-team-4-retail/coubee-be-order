@@ -224,8 +224,8 @@ public class OrderController {
 
         // OpenFeign 클라이언트를 사용하여 사용자 정보를 조회합니다.
         // (Fetch the user information using the OpenFeign client.)
-        ApiResponseDto<SiteUserInfoDto> userResponse = userServiceClient.getUserInfo(orderDetail.getUserId());
-        
+        ApiResponseDto<SiteUserInfoDto> userResponse = userServiceClient.getUserInfoById(orderDetail.getUserId());
+
         // 응답받은 SiteUserInfoDto를 OrderCustomerInfoDto로 매핑합니다.
         // (Maps the received SiteUserInfoDto to an OrderCustomerInfoDto.)
         OrderCustomerInfoDto customerInfo = mapToCustomerInfo(userResponse.getData());
