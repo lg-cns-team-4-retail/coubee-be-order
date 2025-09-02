@@ -249,27 +249,48 @@ public class PaymentServiceImpl implements PaymentService {
     public String createAndCompleteTestOrder(com.coubee.coubeebeorder.domain.dto.TestOrderCreateRequest request) {
         log.info("Creating and force-completing test order for request: {}", request);
 
-        // 1. Product Service에서 실제 상품 정보 조회 (가격을 가져오기 위함) (translation: 1. Fetch actual product information from Product Service (to get the price))
+        // 1. Product Service에서 실제 상품 정보 조회 (가격을 가져오기 위함)
+        // (Fetch actual product information from Product Service (to get the price))
         com.coubee.coubeebeorder.common.dto.ApiResponseDto<com.coubee.coubeebeorder.remote.product.ProductResponseDto> productResponse = productClient.getProductById(request.getProductId(), request.getUserId());
         if (productResponse == null || productResponse.getData() == null) {
             throw new com.coubee.coubeebeorder.common.exception.NotFound("Test failed: Product not found with ID: " + request.getProductId());
         }
         com.coubee.coubeebeorder.remote.product.ProductResponseDto product = productResponse.getData();
 
-        // 2. 조회한 상품 정보로 주문 데이터 생성 (translation: 2. Create order data with the fetched product information)
+        // 2. 리팩토링된 금액 계산 로직을 적용하여 원가, 할인가, 최종 결제액을 계산합니다.
+        // (Applies the refactored amount calculation logic to determine original amount, discount, and final payment amount.)
+        int totalOriginAmount = product.getOriginPrice() * request.getQuantity();
+        int totalSaleAmount = product.getSalePrice() * request.getQuantity();
+        int productDiscountAmount = totalOriginAmount - totalSaleAmount;
+        
+        // 테스트 주문에서는 핫딜 할인이 없다고 가정합니다.
+        // (For test orders, assume there is no hotdeal discount.)
+        int hotdealDiscountAmount = 0;
+        
+        // 총 할인액은 상품 할인액과 핫딜 할인액의 합계입니다.
+        // (Total discount amount is the sum of product discount and hotdeal discount.)
+        int totalDiscountAmount = productDiscountAmount + hotdealDiscountAmount;
+        
+        // 최종 결제 금액은 판매가에서 핫딜 할인액을 뺀 값입니다.
+        // (Final payment amount is the sale amount minus hotdeal discount.)
+        int finalPaymentAmount = totalSaleAmount - hotdealDiscountAmount;
+
+        // 3. 조회한 상품 정보로 주문 데이터 생성
+        // (Create order data with the fetched product information)
         String orderId = "test_order_" + java.util.UUID.randomUUID().toString().replace("-", "");
-        int totalAmount = product.getSalePrice() * request.getQuantity(); // 실제 상품 가격으로 총액 계산 (translation: Calculate total amount with the actual product price)
         String recipientName = "Test User";
 
-        Order order = Order.createOrder(orderId, request.getUserId(), request.getStoreId(), totalAmount, recipientName);
+        Order order = Order.createOrder(orderId, request.getUserId(), request.getStoreId(), totalOriginAmount, totalDiscountAmount, finalPaymentAmount, recipientName);
         OrderItem item = OrderItem.createOrderItem(product.getProductId(), product.getProductName(), request.getQuantity(), product.getSalePrice());
         order.addOrderItem(item);
 
-        // 3. 결제 데이터 생성 (translation: 3. Create payment data)
-        Payment payment = Payment.createPayment(orderId, order, "CARD", totalAmount);
+        // 4. 결제 데이터 생성
+        // (Create payment data)
+        Payment payment = Payment.createPayment(orderId, order, "CARD", finalPaymentAmount);
         order.setPayment(payment);
 
-        // 4. 주문 및 결제 상태를 강제로 'PAID'로 변경 (translation: 4. Forcefully update order and payment status to 'PAID')
+        // 5. 주문 및 결제 상태를 강제로 'PAID'로 변경
+        // (Forcefully update order and payment status to 'PAID')
         order.updateStatus(OrderStatus.PAID);
         order.markAsPaidNow();
         order.getItems().forEach(orderItem -> orderItem.updateEventType(EventType.PURCHASE));
@@ -277,16 +298,21 @@ public class PaymentServiceImpl implements PaymentService {
         payment.updateStatus(PaymentStatus.PAID);
         payment.updatePaidStatus("test-pg", "test-pg-tid-" + orderId, "http://test.receipt.url");
 
-        // 5. [FIX] 데이터베이스에 먼저 저장합니다. (translation: 5. [FIX] First, save to the database.)
-        // Cascade 설정으로 인해 Order, OrderItem, Payment가 모두 저장됩니다. (translation: Due to Cascade settings, Order, OrderItem, and Payment will all be saved.)
+        // 6. [FIX] 데이터베이스에 먼저 저장합니다.
+        // ([FIX] First, save to the database.)
+        // Cascade 설정으로 인해 Order, OrderItem, Payment가 모두 저장됩니다.
+        // (Due to Cascade settings, Order, OrderItem, and Payment will all be saved.)
         orderRepository.save(order);
         log.info("Test order saved to database with orderId: {}", orderId);
 
-        // 6. [FIX] 저장된 후에 상태 변경 이력을 기록합니다. (translation: 6. [FIX] Record the status change history after saving.)
-        // 이렇게 함으로써 updateOrderStatusWithHistory가 DB에서 주문을 조회할 시점에는 이미 주문 데이터가 존재하게 되어 NotFound 예외가 발생하지 않습니다. (translation: This ensures the order data already exists when updateOrderStatusWithHistory queries the DB, preventing a NotFound exception.)
+        // 7. [FIX] 저장된 후에 상태 변경 이력을 기록합니다.
+        // ([FIX] Record the status change history after saving.)
+        // 이렇게 함으로써 updateOrderStatusWithHistory가 DB에서 주문을 조회할 시점에는 이미 주문 데이터가 존재하게 되어 NotFound 예외가 발생하지 않습니다.
+        // (This ensures the order data already exists when updateOrderStatusWithHistory queries the DB, preventing a NotFound exception.)
         orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
 
-        // 7. Kafka 이벤트 발행 (translation: 7. Publish Kafka event)
+        // 8. Kafka 이벤트 발행
+        // (Publish Kafka event)
         publishPaymentCompletedEvent(order, payment);
 
         return orderId;
