@@ -50,6 +50,9 @@ public class OrderDetailResponseDto {
     @Schema(description = "Customer information")
     private SiteUserInfoDto customerInfo;
 
+    @Schema(description = "The complete history of status changes for the order.")
+    private List<OrderStatusTimestampInfo> statusHistory;
+
     /**
      * 상점 정보 내부 클래스
      * (Store information inner class)
@@ -109,5 +112,24 @@ public class OrderDetailResponseDto {
         @Schema(description = "Payment completion time")
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
         private LocalDateTime paidAt;
+    }
+
+    /**
+     * 주문 상태 변경 이력 정보 내부 클래스
+     * (Order status change history information inner class)
+     */
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "Represents a single status change event.")
+    public static class OrderStatusTimestampInfo {
+        
+        @Schema(description = "The status", example = "PAID")
+        private String status;
+
+        @Schema(description = "The timestamp of the status change")
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
+        private LocalDateTime updatedAt;
     }
 }

@@ -270,6 +270,18 @@ public class OrderController {
                     .build();
         }
 
+        // 상태 변경 이력을 변환합니다.
+        // (Converts the status change history.)
+        List<OrderDetailResponseDto.OrderStatusTimestampInfo> statusHistoryInfo = null;
+        if (orderDetail.getStatusHistory() != null) {
+            statusHistoryInfo = orderDetail.getStatusHistory().stream()
+                    .map(history -> OrderDetailResponseDto.OrderStatusTimestampInfo.builder()
+                            .status(history.getStatus().name())
+                            .updatedAt(history.getUpdatedAt())
+                            .build())
+                    .toList();
+        }
+
         // 최종 응답 DTO를 구성합니다.
         // (Builds the final response DTO.)
         return OrderDetailResponseDto.builder()
@@ -282,6 +294,7 @@ public class OrderController {
                 .items(items)
                 .payment(paymentInfo)
                 .customerInfo(customerInfo)
+                .statusHistory(statusHistoryInfo)
                 .build();
     }
 
