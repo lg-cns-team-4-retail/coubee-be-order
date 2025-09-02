@@ -59,4 +59,7 @@ public interface OrderService {
      * @return store order summary response containing statistics and detailed order list
      */
     StoreOrderSummaryResponseDto getStoreOrderSummary(Long ownerUserId, Long storeId, LocalDate startDate, LocalDate endDate, Pageable pageable);
+
+    // [ADD] New method signature for getting a store's orders.
+    Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, Pageable pageable);
 }

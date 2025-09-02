@@ -597,4 +597,29 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                                                      LocalDateTime startDate,
                                                                      LocalDateTime endDate,
                                                                      Pageable pageable);
+
+    // [ADD] New method to fetch store order IDs, sorted by oldest first.
+    @Query(value = "SELECT DISTINCT o.order_id, o.created_at " +
+                   "FROM coubee_order.orders o " +
+                   "WHERE o.store_id = :storeId " +
+                   "AND (:status IS NULL OR o.status = :status) " +
+                   "ORDER BY o.created_at ASC " + // Sort by oldest first
+                   "LIMIT :#{#pageable.pageSize} OFFSET :#{#pageable.offset}",
+           countQuery = "SELECT COUNT(DISTINCT o.order_id) " +
+                        "FROM coubee_order.orders o " +
+                        "WHERE o.store_id = :storeId " +
+                        "AND (:status IS NULL OR o.status = :status)",
+           nativeQuery = true)
+    Page<Object[]> findStoreOrderIdsNativeAsc(@Param("storeId") Long storeId,
+                                              @Param("status") String status,
+                                              Pageable pageable);
+
+    // [ADD] New method to fetch full order details, sorted by oldest first.
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items " +
+           "LEFT JOIN FETCH o.payment " +
+           "LEFT JOIN FETCH o.statusHistory " +
+           "WHERE o.orderId IN :orderIds " +
+           "ORDER BY o.createdAt ASC") // Sort by oldest first
+    List<Order> findWithDetailsInAsc(@Param("orderIds") List<String> orderIds);
 }

@@ -902,4 +902,39 @@ public class OrderServiceImpl implements OrderService {
                 .orders(ordersPage)
                 .build();
     }
+
+    // [ADD] Implementation for the new getStoreOrders method.
+    @Override
+    public Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, Pageable pageable) {
+        log.info("Getting store orders - ownerId: {}, storeId: {}, status: {}, pageable: {}", ownerUserId, storeId, status, pageable);
+
+        // 1. Security Check: Verify the user owns the store.
+        ApiResponseDto<List<Long>> ownedStoresResponse = storeClient.getStoresByOwnerIdOnApproved(ownerUserId);
+        if (ownedStoresResponse.getData() == null || !ownedStoresResponse.getData().contains(storeId)) {
+            // (translation: You do not have permission to view orders for this store.)
+            throw new IllegalArgumentException("이 매장의 주문을 조회할 권한이 없습니다.");
+        }
+
+        // 2. Call the new repository method with ASC sorting.
+        String statusString = (status == null) ? null : status.name();
+        Page<Object[]> orderDataPage = orderRepository.findStoreOrderIdsNativeAsc(storeId, statusString, pageable);
+
+        if (orderDataPage.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        // 3. Use the two-step fetch pattern to avoid N+1 issues.
+        List<String> orderIds = orderDataPage.getContent().stream()
+                .map(row -> (String) row[0])
+                .collect(Collectors.toList());
+
+        // Call the NEW ASC-sorted details method.
+        List<Order> ordersWithDetails = orderRepository.findWithDetailsInAsc(orderIds);
+        
+        // Reuse the existing helper method to convert entities to DTOs.
+        List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(ordersWithDetails);
+
+        // 4. Assemble and return the final Page object.
+        return new PageImpl<>(orderDetailResponses, pageable, orderDataPage.getTotalElements());
+    }
 }
