@@ -320,11 +320,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         Long getTotalOrderCount();
         Long getTotalOriginalAmount();
         Long getTotalDiscountAmount();
+        Long getFinalPurchaseAmount();
     }
 
     /**
      * Get user order summary aggregation for valid orders
      * Only includes orders with status: PAID, PREPARING, PREPARED, RECEIVED
+     * Updated to include finalPurchaseAmount (totalAmount) from the refactored schema
      *
      * @param userId user ID
      * @return optional user order summary projection (empty if no valid orders found)
@@ -332,7 +334,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT " +
            "   count(o.id) as totalOrderCount, " +
            "   COALESCE(sum(o.originalAmount), 0L) as totalOriginalAmount, " +
-           "   COALESCE(sum(o.discountAmount), 0L) as totalDiscountAmount " +
+           "   COALESCE(sum(o.discountAmount), 0L) as totalDiscountAmount, " +
+           "   COALESCE(sum(o.totalAmount), 0L) as finalPurchaseAmount " +
            "FROM Order o " +
            "WHERE o.userId = :userId " +
            "AND o.status IN ('PAID', 'PREPARING', 'PREPARED', 'RECEIVED')")

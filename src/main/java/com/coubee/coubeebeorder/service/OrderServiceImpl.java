@@ -64,8 +64,11 @@ public class OrderServiceImpl implements OrderService {
 
         String orderId = "order_" + UUID.randomUUID().toString().replace("-", "");
 
-        // First, fetch all product information and calculate original amount
-        int originalAmount = 0;
+        // 상품 정보를 가져오고 원가, 판매가, 상품별 할인액을 계산합니다.
+        // (Fetch product information and calculate origin price, sale price, and product-specific discounts.)
+        int totalOriginAmount = 0;
+        int totalSaleAmount = 0;
+        int productDiscountAmount = 0;
         List<ProductResponseDto> productDetails = new ArrayList<>();
 
         for (OrderCreateRequest.OrderItemRequest itemRequest : request.getItems()) {
@@ -87,15 +90,18 @@ public class OrderServiceImpl implements OrderService {
                                      ". Available: " + product.getStock() + ", Requested: " + itemRequest.getQuantity());
                 }
 
-                // Use salePrice for calculations
-                int itemTotalPrice = product.getSalePrice() * itemRequest.getQuantity();
-                originalAmount += itemTotalPrice;
+                int quantity = itemRequest.getQuantity();
+                
+                // 원가와 판매가를 각각 계산합니다.
+                // (Calculate origin price and sale price separately.)
+                totalOriginAmount += product.getOriginPrice() * quantity;
+                totalSaleAmount += product.getSalePrice() * quantity;
 
                 productDetails.add(product);
 
-                log.debug("Validated product: productId={}, productName={}, quantity={}, price={}, itemTotal={}",
-                         product.getProductId(), product.getProductName(), itemRequest.getQuantity(),
-                         product.getSalePrice(), itemTotalPrice);
+                log.debug("Validated product: productId={}, productName={}, quantity={}, originPrice={}, salePrice={}",
+                         product.getProductId(), product.getProductName(), quantity,
+                         product.getOriginPrice(), product.getSalePrice());
 
             } catch (FeignException.NotFound e) {
                 log.error("Product not found: productId={}", itemRequest.getProductId());
@@ -107,9 +113,13 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Check for active hotdeal and track hotdeal status
-        int discountAmount = 0;
-        int finalAmount = originalAmount;
+        // 상품 자체 할인액(원가 - 판매가)을 계산합니다.
+        // (Calculate product-specific discount amount (origin price - sale price).)
+        productDiscountAmount = totalOriginAmount - totalSaleAmount;
+
+        // 핫딜 할인을 확인하고 추적합니다.
+        // (Check for active hotdeal and track hotdeal status.)
+        int hotdealDiscountAmount = 0;
         boolean isHotdealActive = false;
 
         try {
@@ -122,13 +132,13 @@ public class OrderServiceImpl implements OrderService {
                 log.info("Active hotdeal found for storeId: {}, saleRate: {}, maxDiscount: {}",
                         request.getStoreId(), hotdeal.getSaleRate(), hotdeal.getMaxDiscount());
 
-                // Calculate discount amount
-                double calculatedDiscount = originalAmount * hotdeal.getSaleRate();
-                discountAmount = (int) Math.min(calculatedDiscount, hotdeal.getMaxDiscount());
-                finalAmount = originalAmount - discountAmount;
+                // 핫딜 할인은 판매가 총액을 기준으로 계산합니다.
+                // (Hotdeal discount is calculated based on the total sale amount.)
+                double calculatedDiscount = totalSaleAmount * hotdeal.getSaleRate();
+                hotdealDiscountAmount = (int) Math.min(calculatedDiscount, hotdeal.getMaxDiscount());
 
-                log.info("Hotdeal applied: originalAmount={}, discountAmount={}, finalAmount={}",
-                        originalAmount, discountAmount, finalAmount);
+                log.info("Hotdeal applied: totalSaleAmount={}, hotdealDiscountAmount={}",
+                        totalSaleAmount, hotdealDiscountAmount);
             } else {
                 log.debug("No active hotdeal found for storeId: {}", request.getStoreId());
             }
@@ -138,9 +148,18 @@ public class OrderServiceImpl implements OrderService {
             // Continue without discount if hotdeal service fails
         }
 
-        // Create order with original amount, discount amount, and final amount
+        // 상품 자체 할인액(원가 - 판매가)과 핫딜 할인을 합산하여 최종 총 할인액을 계산합니다.
+        // (Calculate the final total discount amount by summing the product-specific discount and the hotdeal discount.)
+        int totalDiscountAmount = productDiscountAmount + hotdealDiscountAmount;
+        
+        // 최종 결제 금액을 계산합니다 (판매가 총액 - 핫딜 할인액).
+        // (Calculate the final payment amount (total sale amount - hotdeal discount).)
+        int finalPaymentAmount = totalSaleAmount - hotdealDiscountAmount;
+
+        // 새로운 비즈니스 로직에 따라 주문을 생성합니다.
+        // (Create order according to the new business logic.)
         Order order = Order.createOrder(
-                orderId, userId, request.getStoreId(), originalAmount, discountAmount, finalAmount, request.getRecipientName());
+                orderId, userId, request.getStoreId(), totalOriginAmount, totalDiscountAmount, finalPaymentAmount, request.getRecipientName());
 
         // Add order items with real product data and hotdeal status
         for (int i = 0; i < request.getItems().size(); i++) {
@@ -165,13 +184,13 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.save(order);
 
-        log.info("Order created successfully: orderId={}, originalAmount={}, discountAmount={}, finalAmount={}",
-                orderId, originalAmount, discountAmount, finalAmount);
+        log.info("Order created successfully: orderId={}, totalOriginAmount={}, totalDiscountAmount={}, finalPaymentAmount={}",
+                orderId, totalOriginAmount, totalDiscountAmount, finalPaymentAmount);
 
         return OrderCreateResponse.builder()
                 .orderId(orderId)
                 .paymentId(orderId)
-                .amount(finalAmount)
+                .amount(finalPaymentAmount)
                 .orderName(generateOrderName(order.getItems()))
                 .buyerName(request.getRecipientName())
                 .build();
@@ -809,13 +828,14 @@ public class OrderServiceImpl implements OrderService {
         }
 
         UserOrderSummaryProjection projection = projectionOpt.get();
-        Long finalPurchaseAmount = projection.getTotalOriginalAmount() - projection.getTotalDiscountAmount();
-
+        
+        // 새로운 프로젝션에서 최종 구매 금액을 직접 가져옵니다.
+        // (Get the final purchase amount directly from the new projection.)
         return UserOrderSummaryDto.builder()
                 .totalOrderCount(projection.getTotalOrderCount())
                 .totalOriginalAmount(projection.getTotalOriginalAmount())
                 .totalDiscountAmount(projection.getTotalDiscountAmount())
-                .finalPurchaseAmount(finalPurchaseAmount)
+                .finalPurchaseAmount(projection.getFinalPurchaseAmount())
                 .build();
     }
 
