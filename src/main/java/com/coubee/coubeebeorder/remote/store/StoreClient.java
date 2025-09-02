@@ -82,4 +82,17 @@ public interface StoreClient {
      */
     @GetMapping("/backend/store/owner/{ownerId}/approved-stores")
     ApiResponseDto<List<Long>> getStoresByOwnerIdOnApproved(@PathVariable("ownerId") Long ownerId);
+
+    /**
+     * 지정된 좌표 근처의 스토어 ID 목록 조회 (공개 API)
+     *
+     * @param latitude 위도
+     * @param longitude 경도
+     * @return 근처 스토어 ID 목록을 포함한 ApiResponseDto
+     */
+    @GetMapping("/api/store/nearby")
+    ApiResponseDto<List<Long>> getNearStoreIds(
+            @RequestParam("latitude") double latitude,
+            @RequestParam("longitude") double longitude
+    );
 }

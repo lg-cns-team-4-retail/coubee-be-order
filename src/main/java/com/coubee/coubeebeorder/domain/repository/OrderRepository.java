@@ -623,4 +623,45 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "WHERE o.orderId IN :orderIds " +
            "ORDER BY o.createdAt ASC") // Sort by oldest first
     List<Order> findWithDetailsInAsc(@Param("orderIds") List<String> orderIds);
+
+    // ========================================
+    // Bestseller Products Query Methods
+    // ========================================
+
+    /**
+     * Projection interface for bestseller product information
+     */
+    interface BestsellerProductProjection {
+        Long getProductId();
+        Long getTotalQuantity();
+    }
+
+    /**
+     * Find bestseller products across specified store IDs
+     * Returns products ordered by total quantity sold (descending)
+     *
+     * @param storeIds list of store IDs to filter by
+     * @param pageable pagination information
+     * @return paginated list of bestseller product projections
+     */
+    @Query(value = """
+        SELECT 
+            oi.product_id as productId,
+            SUM(oi.quantity) as totalQuantity
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.order_id
+        WHERE o.store_id IN :storeIds
+        AND o.status IN ('PAID', 'RECEIVED')
+        GROUP BY oi.product_id
+        ORDER BY totalQuantity DESC
+        """, 
+        countQuery = """
+        SELECT COUNT(DISTINCT oi.product_id)
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.order_id
+        WHERE o.store_id IN :storeIds
+        AND o.status IN ('PAID', 'RECEIVED')
+        """,
+        nativeQuery = true)
+    Page<BestsellerProductProjection> findBestsellersByStoreIds(@Param("storeIds") List<Long> storeIds, Pageable pageable);
 }

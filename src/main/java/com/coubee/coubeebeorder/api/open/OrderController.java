@@ -18,6 +18,7 @@ import com.coubee.coubeebeorder.service.OrderService;
 import com.coubee.coubeebeorder.service.StoreSecurityService;
 import com.coubee.coubeebeorder.remote.user.UserServiceClient;
 import com.coubee.coubeebeorder.remote.user.SiteUserInfoDto;
+import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -296,6 +297,23 @@ public class OrderController {
                 .customerInfo(customerInfo)
                 .statusHistory(statusHistoryInfo)
                 .build();
+    }
+
+    @Operation(summary = "Get Nearby Bestsellers", description = "Retrieves paginated list of best-selling products from stores near the specified coordinates")
+    @GetMapping("/products/bestsellers-nearby")
+    public ApiResponseDto<Page<ProductResponseDto>> getNearbyBestsellers(
+            @Parameter(description = "Latitude coordinate", required = true, example = "37.5665")
+            @RequestParam double latitude,
+            @Parameter(description = "Longitude coordinate", required = true, example = "126.9780")
+            @RequestParam double longitude,
+            @Parameter(description = "Page number", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+
+        PageRequest pageRequest = PageRequest.of(page, size);
+        Page<ProductResponseDto> response = orderService.getNearbyBestsellers(latitude, longitude, pageRequest);
+        return ApiResponseDto.readOk(response);
     }
 
 }

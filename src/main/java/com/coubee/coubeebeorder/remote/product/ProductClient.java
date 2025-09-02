@@ -70,4 +70,16 @@ public interface ProductClient {
             @RequestParam("productIds") List<Long> productIds,
             @RequestHeader("X-Auth-UserId") Long userId
     );
+
+    /**
+     * 여러 상품 ID로 상품 상세 정보 일괄 조회 (공개 API)
+     * N+1 문제 해결을 위한 벌크 조회 API - 인증 불필요
+     *
+     * @param productIds 조회할 상품 ID 목록
+     * @return 상품 ID를 키로 하는 ProductResponseDto 맵을 포함한 ApiResponseDto
+     */
+    @GetMapping("/api/product/bulk")
+    ApiResponseDto<Map<Long, ProductResponseDto>> getProductsByIdsPublic(
+            @RequestParam("productIds") List<Long> productIds
+    );
 }

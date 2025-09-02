@@ -11,6 +11,7 @@ import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
 import com.coubee.coubeebeorder.domain.dto.StoreOrderSummaryResponseDto;
 import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
+import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -62,4 +63,14 @@ public interface OrderService {
 
     // [ADD] New method signature for getting a store's orders.
     Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, Pageable pageable);
+
+    /**
+     * Get nearby bestseller products based on geographical coordinates
+     *
+     * @param latitude latitude coordinate
+     * @param longitude longitude coordinate
+     * @param pageable pagination information
+     * @return paginated list of bestseller products from nearby stores
+     */
+    Page<ProductResponseDto> getNearbyBestsellers(double latitude, double longitude, Pageable pageable);
 }

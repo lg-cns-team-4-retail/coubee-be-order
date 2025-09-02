@@ -934,4 +934,64 @@ public class OrderServiceImpl implements OrderService {
         // 4. Assemble and return the final Page object.
         return new PageImpl<>(orderDetailResponses, pageable, orderDataPage.getTotalElements());
     }
+
+    @Override
+    public Page<ProductResponseDto> getNearbyBestsellers(double latitude, double longitude, Pageable pageable) {
+        log.info("Getting nearby bestsellers for coordinates: lat={}, lng={}, pageable={}", latitude, longitude, pageable);
+
+        try {
+            // Step 1: Get nearby store IDs
+            ApiResponseDto<List<Long>> nearbyStoresResponse = storeClient.getNearStoreIds(latitude, longitude);
+            
+            if (nearbyStoresResponse == null || nearbyStoresResponse.getData() == null || nearbyStoresResponse.getData().isEmpty()) {
+                log.info("No nearby stores found for coordinates: lat={}, lng={}", latitude, longitude);
+                return Page.empty(pageable);
+            }
+
+            List<Long> nearbyStoreIds = nearbyStoresResponse.getData();
+            log.debug("Found {} nearby stores: {}", nearbyStoreIds.size(), nearbyStoreIds);
+
+            // Step 2: Get bestseller products from these stores
+            Page<OrderRepository.BestsellerProductProjection> bestsellerPage = 
+                orderRepository.findBestsellersByStoreIds(nearbyStoreIds, pageable);
+
+            if (bestsellerPage.isEmpty()) {
+                log.info("No bestseller products found for nearby stores: {}", nearbyStoreIds);
+                return Page.empty(pageable);
+            }
+
+            // Step 3: Extract product IDs maintaining order
+            List<Long> productIds = bestsellerPage.getContent().stream()
+                    .map(OrderRepository.BestsellerProductProjection::getProductId)
+                    .collect(Collectors.toList());
+
+            log.debug("Found {} bestseller products: {}", productIds.size(), productIds);
+
+            // Step 4: Fetch product details in bulk using public API
+            ApiResponseDto<Map<Long, ProductResponseDto>> productsResponse = 
+                productClient.getProductsByIdsPublic(productIds);
+
+            if (productsResponse == null || productsResponse.getData() == null) {
+                log.warn("Failed to fetch product details for bestseller products: {}", productIds);
+                return Page.empty(pageable);
+            }
+
+            Map<Long, ProductResponseDto> productMap = productsResponse.getData();
+
+            // Step 5: Re-order products to match sales rank order
+            List<ProductResponseDto> orderedProducts = productIds.stream()
+                    .map(productMap::get)
+                    .filter(product -> product != null) // Filter out any missing products
+                    .collect(Collectors.toList());
+
+            log.info("Successfully retrieved {} nearby bestseller products", orderedProducts.size());
+
+            // Step 6: Return PageImpl with ordered products and original pagination info
+            return new PageImpl<>(orderedProducts, pageable, bestsellerPage.getTotalElements());
+
+        } catch (Exception e) {
+            log.error("Error getting nearby bestsellers for coordinates: lat={}, lng={}", latitude, longitude, e);
+            return Page.empty(pageable);
+        }
+    }
 }
