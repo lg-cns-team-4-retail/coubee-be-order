@@ -46,6 +46,9 @@ public class OrderDetailResponseDto {
     @Schema(description = "Payment information")
     private PaymentInfo payment;
 
+    @Schema(description = "Customer information")
+    private OrderCustomerInfoDto customerInfo;
+
     /**
      * 상점 정보 내부 클래스
      * (Store information inner class)

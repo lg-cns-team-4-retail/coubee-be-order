@@ -1,0 +1,28 @@
+package com.coubee.coubeebeorder.remote.user;
+
+import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+/**
+ * User 서비스와 통신하기 위한 Feign 클라이언트
+ * (Feign client for communicating with the User service)
+ */
+@FeignClient(
+    name = "coubee-be-user-service",
+    url = "http://coubee-be-user-service:8080",
+    configuration = com.coubee.coubeebeorder.config.FeignConfig.class
+)
+public interface UserServiceClient {
+
+    /**
+     * 사용자 ID로 사용자 정보 조회
+     * (Retrieve user information by user ID)
+     *
+     * @param userId 조회할 사용자의 ID
+     * @return SiteUserInfoDto를 포함한 ApiResponseDto
+     */
+    @GetMapping("/backend/user/user/{userId}")
+    ApiResponseDto<SiteUserInfoDto> getUserInfo(@PathVariable("userId") Long userId);
+}
