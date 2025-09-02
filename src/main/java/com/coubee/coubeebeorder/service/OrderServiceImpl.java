@@ -469,12 +469,12 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private String generateOrderName(List<OrderItem> items) {
+    private String generateOrderName(Set<OrderItem> items) {
         if (items.isEmpty()) {
             return "빈 주문";
         }
 
-        OrderItem firstItem = items.get(0);
+        OrderItem firstItem = items.iterator().next();
         if (items.size() == 1) {
             return firstItem.getProductName();
         } else {
