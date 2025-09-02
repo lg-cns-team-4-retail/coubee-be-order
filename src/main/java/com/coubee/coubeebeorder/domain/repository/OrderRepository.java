@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -552,4 +553,48 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<SoldItemsSummaryProjection> getSoldItemsSummaryWithHotdeal(@Param("startUnix") Long startUnix,
                                                                     @Param("endUnix") Long endUnix,
                                                                     @Param("storeId") Long storeId);
+
+    // ========================================
+    // Store Owner Order Summary Query Methods
+    // ========================================
+
+    /**
+     * Projection interface for order count by status
+     */
+    interface OrderCountByStatusProjection {
+        String getStatus();
+        Long getOrderCount();
+    }
+
+    /**
+     * Count orders grouped by status within a date range for a specific store
+     *
+     * @param storeId store ID to filter by
+     * @param startDate start date (inclusive)
+     * @param endDate end date (inclusive)
+     * @return list of order count by status projections
+     */
+    @Query("SELECT o.status as status, COUNT(o.id) as orderCount " +
+           "FROM Order o " +
+           "WHERE o.storeId = :storeId " +
+           "AND o.createdAt >= :startDate " +
+           "AND o.createdAt < :endDate " +
+           "GROUP BY o.status")
+    List<OrderCountByStatusProjection> countOrdersByStatusInPeriod(@Param("storeId") Long storeId,
+                                                                   @Param("startDate") LocalDateTime startDate,
+                                                                   @Param("endDate") LocalDateTime endDate);
+
+    /**
+     * Find paginated orders for a specific store within a date range
+     *
+     * @param storeId store ID to filter by
+     * @param startDate start date (inclusive)
+     * @param endDate end date (inclusive)
+     * @param pageable pagination information
+     * @return paginated list of orders
+     */
+    Page<Order> findByStoreIdAndCreatedAtBetweenOrderByCreatedAtDesc(Long storeId,
+                                                                     LocalDateTime startDate,
+                                                                     LocalDateTime endDate,
+                                                                     Pageable pageable);
 }

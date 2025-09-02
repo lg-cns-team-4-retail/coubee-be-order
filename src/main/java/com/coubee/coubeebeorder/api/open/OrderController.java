@@ -10,6 +10,7 @@ import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
+import com.coubee.coubeebeorder.domain.dto.StoreOrderSummaryResponseDto;
 import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
 import com.coubee.coubeebeorder.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +23,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @Tag(name = "Order API", description = "APIs for creating, retrieving, and cancelling orders")
 @RestController
@@ -135,5 +138,29 @@ public class OrderController {
 
         OrderStatusUpdateResponse response = orderService.updateOrderStatus(orderId, request, userId);
         return ApiResponseDto.updateOk(response, "Order status has been updated");
+    }
+
+    @Operation(summary = "Get Store Order Summary", description = "Retrieves order summary statistics and paginated order list for store owners")
+    @GetMapping("/stores/{storeId}/orders/summary")
+    public ApiResponseDto<StoreOrderSummaryResponseDto> getStoreOrderSummary(
+            @Parameter(description = "Store ID", required = true, example = "1")
+            @PathVariable Long storeId,
+            @Parameter(description = "Start date for summary period", example = "2023-06-01")
+            @RequestParam(required = false) LocalDate startDate,
+            @Parameter(description = "End date for summary period", example = "2023-06-30")
+            @RequestParam(required = false) LocalDate endDate,
+            @Parameter(description = "Page number", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+
+        // Retrieve owner user ID from X-Auth-UserId header
+        Long ownerUserId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
+
+        PageRequest pageRequest = PageRequest.of(page, size);
+        StoreOrderSummaryResponseDto response = orderService.getStoreOrderSummary(
+                ownerUserId, storeId, startDate, endDate, pageRequest);
+        
+        return ApiResponseDto.readOk(response);
     }
 }

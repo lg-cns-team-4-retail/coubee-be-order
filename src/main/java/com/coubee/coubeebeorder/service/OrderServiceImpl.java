@@ -7,6 +7,7 @@ import com.coubee.coubeebeorder.common.exception.NotFound;
 import com.coubee.coubeebeorder.domain.*;
 import com.coubee.coubeebeorder.domain.dto.*;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
+import com.coubee.coubeebeorder.domain.repository.OrderRepository.OrderCountByStatusProjection;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository.UserOrderSummaryProjection;
 import com.coubee.coubeebeorder.domain.repository.OrderTimestampRepository;
 import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
@@ -29,6 +30,9 @@ import com.coubee.coubeebeorder.remote.store.StoreResponseDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -814,6 +818,88 @@ public class OrderServiceImpl implements OrderService {
                 .totalOriginalAmount(projection.getTotalOriginalAmount())
                 .totalDiscountAmount(projection.getTotalDiscountAmount())
                 .finalPurchaseAmount(finalPurchaseAmount)
+                .build();
+    }
+
+    @Override
+    public StoreOrderSummaryResponseDto getStoreOrderSummary(Long ownerUserId, Long storeId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        log.info("Getting store order summary for ownerUserId: {}, storeId: {}, startDate: {}, endDate: {}", 
+                 ownerUserId, storeId, startDate, endDate);
+
+        // Security Check: Verify store ownership
+        try {
+            ApiResponseDto<List<Long>> storeResponse = storeClient.getStoresByOwnerIdOnApproved(ownerUserId);
+            if (storeResponse == null || storeResponse.getData() == null || !storeResponse.getData().contains(storeId)) {
+                throw new IllegalArgumentException("User " + ownerUserId + " is not the owner of store " + storeId);
+            }
+        } catch (Exception e) {
+            log.error("Failed to verify store ownership for ownerUserId: {}, storeId: {}", ownerUserId, storeId, e);
+            throw new IllegalArgumentException("Failed to verify store ownership: " + e.getMessage());
+        }
+
+        // Date Handling: Default to current date if null
+        LocalDate effectiveStartDate = startDate != null ? startDate : LocalDate.now();
+        LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
+        
+        // Convert LocalDate to LocalDateTime for repository queries
+        LocalDateTime startDateTime = effectiveStartDate.atStartOfDay();
+        LocalDateTime endDateTime = effectiveEndDate.atTime(LocalTime.MAX);
+
+        // Calculate Summary: Get order counts by status
+        List<OrderCountByStatusProjection> statusCounts = orderRepository.countOrdersByStatusInPeriod(
+                storeId, startDateTime, endDateTime);
+        
+        // Process results to calculate totals
+        long totalOrderCount = 0;
+        long paidOrderCount = 0;
+        long receivedOrderCount = 0;
+        long canceledOrderCount = 0;
+
+        for (OrderCountByStatusProjection statusCount : statusCounts) {
+            String status = statusCount.getStatus();
+            Long count = statusCount.getOrderCount();
+            
+            totalOrderCount += count;
+            
+            switch (status) {
+                case "PAID", "PREPARING", "PREPARED", "RECEIVED" -> paidOrderCount += count;
+                case "CANCELLED" -> canceledOrderCount += count;
+            }
+            
+            // Count received orders separately
+            if ("RECEIVED".equals(status)) {
+                receivedOrderCount += count;
+            }
+        }
+
+        // Create order count summary
+        StoreOrderSummaryResponseDto.OrderCountSummary orderCountSummary = 
+                StoreOrderSummaryResponseDto.OrderCountSummary.builder()
+                        .totalOrderCount(totalOrderCount)
+                        .paidOrderCount(paidOrderCount)
+                        .receivedOrderCount(receivedOrderCount)
+                        .canceledOrderCount(canceledOrderCount)
+                        .build();
+
+        // Fetch Paginated List: Only if original dates were provided
+        Page<OrderDetailResponse> ordersPage;
+        if (startDate != null && endDate != null) {
+            Page<Order> orderPage = orderRepository.findByStoreIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                    storeId, startDateTime, endDateTime, pageable);
+            
+            List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(orderPage.getContent());
+            ordersPage = new PageImpl<>(orderDetailResponses, pageable, orderPage.getTotalElements());
+        } else {
+            // Return empty page if dates were not provided
+            ordersPage = new PageImpl<>(new ArrayList<>(), pageable, 0);
+        }
+
+        // Assemble and Return
+        return StoreOrderSummaryResponseDto.builder()
+                .startDate(effectiveStartDate)
+                .endDate(effectiveEndDate)
+                .orderCountSummary(orderCountSummary)
+                .orders(ordersPage)
                 .build();
     }
 }

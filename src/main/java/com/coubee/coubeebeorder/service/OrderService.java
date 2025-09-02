@@ -9,9 +9,12 @@ import com.coubee.coubeebeorder.domain.dto.OrderListResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusResponse;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateRequest;
 import com.coubee.coubeebeorder.domain.dto.OrderStatusUpdateResponse;
+import com.coubee.coubeebeorder.domain.dto.StoreOrderSummaryResponseDto;
 import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDate;
 
 public interface OrderService {
 
@@ -44,4 +47,16 @@ public interface OrderService {
      * @return user order summary containing aggregated statistics
      */
     UserOrderSummaryDto getUserOrderSummary(Long userId);
+
+    /**
+     * Get store order summary with statistics and paginated order list
+     *
+     * @param ownerUserId the store owner user ID
+     * @param storeId the store ID
+     * @param startDate start date for the summary period (optional)
+     * @param endDate end date for the summary period (optional)
+     * @param pageable pagination information
+     * @return store order summary response containing statistics and detailed order list
+     */
+    StoreOrderSummaryResponseDto getStoreOrderSummary(Long ownerUserId, Long storeId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 }
