@@ -90,7 +90,7 @@ public interface StoreClient {
      * @param longitude 경도
      * @return 근처 스토어 ID 목록을 포함한 ApiResponseDto
      */
-    @GetMapping("/api/store/nearby")
+    @GetMapping("/backend/store/near")
     ApiResponseDto<List<Long>> getNearStoreIds(
             @RequestParam("latitude") double latitude,
             @RequestParam("longitude") double longitude
