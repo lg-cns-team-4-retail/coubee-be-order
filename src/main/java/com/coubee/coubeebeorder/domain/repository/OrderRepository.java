@@ -49,12 +49,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     /**
      * Step 2: Fetches the full details for a given list of order IDs using fetch joins.
      * This query operates on the specific order IDs retrieved in Step 1.
-     * Includes statusHistory fetch to prevent N+1 query problem.
+     * 카테시안 곱 문제를 해결하기 위해 statusHistory에 대한 JOIN FETCH를 제거합니다.
+     * (Removed JOIN FETCH on statusHistory to resolve the Cartesian Product issue.)
      */
     @Query("SELECT DISTINCT o FROM Order o " +
            "LEFT JOIN FETCH o.items " +
            "LEFT JOIN FETCH o.payment " +
-           "LEFT JOIN FETCH o.statusHistory " +
            "WHERE o.orderId IN :orderIds " +
            "ORDER BY o.createdAt DESC")
     List<Order> findWithDetailsIn(@Param("orderIds") List<String> orderIds);
@@ -615,10 +615,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                               Pageable pageable);
 
     // [ADD] New method to fetch full order details, sorted by oldest first.
+    // 카테시안 곱 문제를 해결하기 위해 statusHistory에 대한 JOIN FETCH를 제거합니다.
+    // (Removed JOIN FETCH on statusHistory to resolve the Cartesian Product issue.)
     @Query("SELECT DISTINCT o FROM Order o " +
            "LEFT JOIN FETCH o.items " +
            "LEFT JOIN FETCH o.payment " +
-           "LEFT JOIN FETCH o.statusHistory " +
            "WHERE o.orderId IN :orderIds " +
            "ORDER BY o.createdAt ASC") // Sort by oldest first
     List<Order> findWithDetailsInAsc(@Param("orderIds") List<String> orderIds);

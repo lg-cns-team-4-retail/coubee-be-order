@@ -29,7 +29,11 @@ data:
         show-sql: true
         open-in-view: false
         properties:
-          hibernate.default_schema: coubee_order
+          hibernate:
+            default_schema: coubee_order
+            # N+1 문제를 해결하고 성능을 최적화하기 위해 배치 페치 크기를 설정합니다.
+            # (Set the batch fetch size to resolve N+1 problems and optimize performance.)
+            default_batch_fetch_size: 100
       
       kafka:
         bootstrap-servers: coubee-external-kafka-service:9092
