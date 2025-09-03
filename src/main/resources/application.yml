@@ -71,7 +71,7 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus # Ensure 'prometheus' is in this list
-      base-path: /api
+      base-path: /actuator
   endpoint:
     health:
       show-details: always
