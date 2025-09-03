@@ -29,8 +29,8 @@ public class OrderPaidEventListener {
             ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(event.storeId(), event.userId());
             String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: Store)
 
-            log.debug("점주 ID 조회 시작 - storeId: {}, userId: {}", event.storeId(), event.userId()); // (translation: Starting owner ID lookup - storeId: {}, userId: {})
-            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(event.storeId(), event.userId());
+            log.debug("점주 ID 조회 시작 - storeId: {}", event.storeId()); // (translation: Starting owner ID lookup - storeId: {})
+            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(event.storeId());
             log.debug("점주 ID 조회 응답: {}", ownerIdResponse); // (translation: Owner ID lookup response: {})
 
             if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {

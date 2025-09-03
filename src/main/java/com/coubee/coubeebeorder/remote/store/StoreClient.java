@@ -101,9 +101,8 @@ public interface StoreClient {
      * store-service의 /backend/store/owner/{storeId} 엔드포인트를 호출합니다. (translation: Calls the /backend/store/owner/{storeId} endpoint in the store-service.)
      *
      * @param storeId 조회할 스토어의 ID (translation: The ID of the store to query)
-     * @param userId X-Auth-UserId 헤더의 사용자 ID (Store 서비스에서 필수) (translation: User ID for X-Auth-UserId header (required by Store service))
      * @return 점주의 userId를 포함한 ApiResponseDto (translation: ApiResponseDto containing the owner's userId)
      */
     @GetMapping("/backend/store/owner/{storeId}")
-    ApiResponseDto<Long> getOwnerIdByStoreId(@PathVariable("storeId") Long storeId, @RequestHeader("X-Auth-UserId") Long userId);
+    ApiResponseDto<Long> getOwnerIdByStoreId(@PathVariable("storeId") Long storeId);
 }

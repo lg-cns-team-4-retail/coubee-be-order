@@ -2,6 +2,7 @@ package com.coubee.coubeebeorder.config;
 
 import feign.Logger;
 import feign.Request;
+import feign.RequestInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,6 +27,17 @@ public class EmptyFeignConfig {
         return Logger.Level.FULL;
     }
     
-    // ★★★ 핵심: 기존 FeignConfig와 달리, 헤더를 추가하는 인터셉터나 에러 디코더 Bean을 여기에 등록하지 않습니다.
-    // 이렇게 하면 Spring Cloud가 자동으로 헤더를 전파하는 기본 동작을 무시하게 됩니다.
+    /**
+     * ★★★ 핵심 수정: 헤더를 강제로 비우는 RequestInterceptor를 추가합니다. ★★★
+     * Spring Cloud의 자동 헤더 전파 로직이 동작하더라도, 이 인터셉터가 실행되는 시점은
+     * 실제 HTTP 요청이 나가기 직전이므로 모든 헤더를 확실하게 제거할 수 있습니다.
+     * @return a RequestInterceptor that clears all headers.
+     */
+    @Bean
+    public RequestInterceptor clearHeadersInterceptor() {
+        return requestTemplate -> {
+            // 기존 헤더를 모두 지웁니다.
+            requestTemplate.headers(null); 
+        };
+    }
 }
