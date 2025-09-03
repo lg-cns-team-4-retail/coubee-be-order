@@ -30,9 +30,16 @@ public class OrderPaidEventListener {
             // 이제 이 로직은 주문이 DB에 완전히 저장된 후에 실행되므로 안전합니다. (translation: This logic is now safe to execute as the order has been fully saved to the DB.)
             ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(event.storeId(), event.userId());
             String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: Store)
+            
 
+
+            
             log.debug("점주 ID 조회 시작 - storeId: {}", event.storeId()); // (translation: Starting owner ID lookup - storeId: {})
             ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(event.storeId());
+            log.info("test :{}",ownerIdResponse.getCode());
+            log.info("test :{}",ownerIdResponse.getData());
+            log.info("test: {}", ownerIdResponse.getMessage());
+            log.info("test: {}", ownerIdResponse.isSuccess());
             log.debug("점주 ID 조회 응답: {}", ownerIdResponse); // (translation: Owner ID lookup response: {})
 
             if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
