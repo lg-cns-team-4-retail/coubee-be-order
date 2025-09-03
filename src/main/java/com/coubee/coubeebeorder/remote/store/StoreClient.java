@@ -104,5 +104,6 @@ public interface StoreClient {
      * @return 점주의 userId를 포함한 ApiResponseDto (translation: ApiResponseDto containing the owner's userId)
      */
     @GetMapping("/backend/store/owner/{storeId}")
-    ApiResponseDto<Long> getOwnerIdByStoreId(@PathVariable("storeId") Long storeId);
+    ApiResponseDto<Long> getOwnerIdByStoreId(@PathVariable(value = "storeId") Long storeId);
+
 }
