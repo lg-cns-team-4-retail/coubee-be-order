@@ -23,7 +23,7 @@ import java.util.Map;
 @FeignClient(
     name = "coubee-be-store-service",
     url = "http://coubee-be-store-service:8080",
-    configuration = com.coubee.coubeebeorder.config.FeignConfig.class
+    configuration = com.coubee.coubeebeorder.config.EmptyFeignConfig.class 
 )
 public interface StoreClient {
 
@@ -104,6 +104,5 @@ public interface StoreClient {
      * @return 점주의 userId를 포함한 ApiResponseDto (translation: ApiResponseDto containing the owner's userId)
      */
     @GetMapping("/backend/store/owner/{storeId}")
-    ApiResponseDto<Long> getOwnerIdByStoreId(@PathVariable(value = "storeId") Long storeId);
-
+    ApiResponseDto<Long> getOwnerIdByStoreId(@PathVariable("storeId") Long storeId);
 }
