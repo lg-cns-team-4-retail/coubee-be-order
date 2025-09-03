@@ -27,7 +27,7 @@ public class OrderPaidEventListener {
             ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(event.storeId(), event.userId());
             String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: Store)
 
-            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(event.storeId());
+            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(event.storeId(), event.userId());
 
             if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
                 Long ownerId = ownerIdResponse.getData();

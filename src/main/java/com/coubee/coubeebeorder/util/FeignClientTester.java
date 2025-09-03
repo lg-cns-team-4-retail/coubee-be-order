@@ -19,15 +19,16 @@ public class FeignClientTester implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        Long testStoreId = 1037L; // 테스트할 storeId
+        Long testStoreId = 1037L; // 테스트할 storeId (translation: storeId to test)
+        Long testUserId = 1L; // 테스트용 사용자 ID (translation: Test user ID)
         
         log.info("======================================================================");
-        log.info("[FEIGN-STARTUP-TEST] 애플리케이션 시작 후 StoreClient 테스트를 시작합니다.");
-        log.info("[FEIGN-STARTUP-TEST] 테스트할 storeId: {}", testStoreId);
+        log.info("[FEIGN-STARTUP-TEST] 애플리케이션 시작 후 StoreClient 테스트를 시작합니다."); // (translation: Starting StoreClient test after application startup.)
+        log.info("[FEIGN-STARTUP-TEST] 테스트할 storeId: {}, userId: {}", testStoreId, testUserId); // (translation: Testing storeId: {}, userId: {})
         log.info("======================================================================");
 
         try {
-            ApiResponseDto<Long> response = storeClient.getOwnerIdByStoreId(testStoreId);
+            ApiResponseDto<Long> response = storeClient.getOwnerIdByStoreId(testStoreId, testUserId);
             
             log.info("[FEIGN-STARTUP-TEST] FeignClient 호출 성공!");
             if (response != null) {
