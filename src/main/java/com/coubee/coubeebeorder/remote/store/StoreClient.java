@@ -95,4 +95,14 @@ public interface StoreClient {
             @RequestParam("latitude") double latitude,
             @RequestParam("longitude") double longitude
     );
+
+    /**
+     * [추가] storeId로 점주의 userId를 조회합니다. (translation: [ADD] Retrieves the owner's userId by storeId.)
+     * store-service의 /backend/store/owner/{storeId} 엔드포인트를 호출합니다. (translation: Calls the /backend/store/owner/{storeId} endpoint in the store-service.)
+     *
+     * @param storeId 조회할 스토어의 ID (translation: The ID of the store to query)
+     * @return 점주의 userId를 포함한 ApiResponseDto (translation: ApiResponseDto containing the owner's userId)
+     */
+    @GetMapping("/backend/store/owner/{storeId}")
+    ApiResponseDto<Long> getOwnerIdByStoreId(@PathVariable("storeId") Long storeId);
 }

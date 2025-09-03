@@ -100,4 +100,23 @@ public class OrderNotificationEvent {
                 .timestamp(LocalDateTime.now())
                 .build();
     }
+
+    /**
+     * [추가] 점주에게 보내는 신규 주문 접수 알림 이벤트 생성 (translation: [ADD] Create a new order notification event for the store owner)
+     * @param orderId 주문 ID (translation: Order ID)
+     * @param ownerId 알림을 받을 점주의 userId (translation: The userId of the store owner who will receive the notification)
+     * @param storeName 매장 이름 (translation: Store name)
+     * @return 점주용 OrderNotificationEvent 객체 (translation: OrderNotificationEvent object for the store owner)
+     */
+    public static OrderNotificationEvent createNewOrderNotificationForOwner(String orderId, Long ownerId, String storeName) {
+        return OrderNotificationEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .notificationType("NEW_ORDER") // 점주를 위한 새로운 알림 타입 (translation: A new notification type for the store owner)
+                .orderId(orderId)
+                .userId(ownerId) // ★★★ 알림 수신 대상을 점주 ID로 설정 (translation: ★★★ Set the notification recipient to the owner's ID)
+                .title("신규 주문 접수") // (translation: New Order Received)
+                .message("[" + storeName + "] 매장에 새로운 주문이 접수되었습니다. 주문을 확인해주세요.") // (translation: A new order has been received at the [" + storeName + "] store. Please check the order.)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
 }

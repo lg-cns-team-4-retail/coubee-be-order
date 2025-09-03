@@ -392,15 +392,12 @@ public class PaymentServiceImpl implements PaymentService {
 
     private void publishPaymentCompletedEvent(Order order, Payment payment) {
         try {
-            // [수정] StoreClient를 통해 매장 정보를 조회합니다.
-            // (translation: [MODIFIED] Fetch store information via StoreClient.)
-            // Note: Current StoreResponseDto doesn't include ownerId, so we'll implement a fallback approach
+            // [수정] StoreClient를 통해 매장 정보를 조회합니다. (translation: [MODIFIED] Fetch store information via StoreClient.)
             ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
-            String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장";
+            String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: "Store")
 
-            // Send payment completion notification to customer only
-
-            // 2. 고객에게 보낼 '결제 완료' 알림 (translation: 2. "Payment Completed" notification for the customer)
+            // 1. [CHANGE] Remove or comment out the existing logic that sends a "Payment Completed" notification to the customer.
+            /* 
             OrderNotificationEvent forCustomer = OrderNotificationEvent.createPaidNotification(
                     order.getOrderId(),
                     order.getUserId(), // ★ 알림 수신 대상을 고객 ID로 설정 (translation: ★ Set recipient to customer's userId)
@@ -408,6 +405,32 @@ public class PaymentServiceImpl implements PaymentService {
             );
             kafkaMessageProducer.publishOrderNotificationEvent(forCustomer);
             log.info("Payment completion notification published (to Customer) - Order: {}, Customer: {}", order.getOrderId(), order.getUserId());
+            */
+
+            // 2. [ADD] Add new logic to send a "New Order" notification to the store owner.
+            try {
+                // Call the StoreClient to get the owner's userId
+                ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(order.getStoreId());
+                
+                if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
+                    Long ownerId = ownerIdResponse.getData();
+
+                    // Create the notification event for the owner
+                    OrderNotificationEvent forOwner = OrderNotificationEvent.createNewOrderNotificationForOwner(
+                            order.getOrderId(),
+                            ownerId, // Set the recipient to the owner's ID
+                            storeName
+                    );
+
+                    // Publish the Kafka message
+                    kafkaMessageProducer.publishOrderNotificationEvent(forOwner);
+                    log.info("New order notification published (to Store Owner) - Order: {}, Owner ID: {}", order.getOrderId(), ownerId);
+                } else {
+                    log.error("Failed to get ownerId for storeId: {}. Notification to owner was not sent. Response: {}", order.getStoreId(), ownerIdResponse);
+                }
+            } catch (Exception e) {
+                log.error("Error while sending new order notification to store owner for order: {}", order.getOrderId(), e);
+            }
 
         } catch (Exception e) {
             log.error("Failed to publish payment completion notification event - Order: {}", order.getOrderId(), e);
