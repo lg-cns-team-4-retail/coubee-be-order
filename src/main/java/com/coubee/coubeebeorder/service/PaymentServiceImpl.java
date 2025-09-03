@@ -409,9 +409,10 @@ public class PaymentServiceImpl implements PaymentService {
 
             // 2. [ADD] Add new logic to send a "New Order" notification to the store owner.
             try {
+                log.info("[DEBUG] StoreClient 호출 시작. storeId: {}. getOwnerIdByStoreId 메소드를 호출합니다.", order.getStoreId());
                 // Call the StoreClient to get the owner's userId
                 ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(order.getStoreId());
-                
+                log.info("[DEBUG] StoreClient 호출 완료. 응답: {}", ownerIdResponse);
                 if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
                     Long ownerId = ownerIdResponse.getData();
 
