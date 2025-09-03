@@ -30,8 +30,10 @@ import io.portone.sdk.server.payment.PaymentMethod;
 import io.portone.sdk.server.payment.PaidPayment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -56,6 +58,13 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentClient portonePaymentClient;
     private final StoreClient storeClient;
     private final ProductClient productClient;
+
+    private PaymentServiceImpl self; // ★★★ (translation: Add a field for self-injection)
+
+    @Autowired
+    public void setSelf(PaymentServiceImpl self) { // ★★★ (translation: Add a setter for self-injection)
+        this.self = self;
+    }
 
     @Override
     @Transactional
@@ -162,7 +171,10 @@ public class PaymentServiceImpl implements PaymentService {
             String eventType = payload.getType();
             if ("Transaction.Paid".equals(eventType)) {
                 log.info("Transaction.Paid 이벤트 처리 - 결제 완료 상태로 업데이트");
-                return processWebhookBasedPayment(merchantUid, transactionId, payload);
+                
+                // ★★★ (translation: Key Change: Call the new method via the 'self' proxy) ★★★
+                self.processAndNotifyPaidPayment(merchantUid, transactionId);
+                return true;
             } else if ("Transaction.Ready".equals(eventType)) {
                 log.info("Transaction.Ready 이벤트 처리 - 결제 준비 상태");
                 return true; // Ready 상태는 별도 처리 불필요
@@ -319,11 +331,61 @@ public class PaymentServiceImpl implements PaymentService {
         // (This ensures the order data already exists when updateOrderStatusWithHistory queries the DB, preventing a NotFound exception.)
         orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
 
-        // 8. Kafka 이벤트 발행
-        // (Publish Kafka event)
-        publishPaymentCompletedEvent(order, payment);
+        // 8. ★★★ (translation: Key Change: Call the new method for notification, not the old one) ★★★
+        String mockTransactionId = "test-tx-id-" + order.getOrderId();
+        self.processAndNotifyPaidPayment(order.getOrderId(), mockTransactionId);
 
         return orderId;
+    }
+
+    // ★★★ (translation: Add the new method below) ★★★
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void processAndNotifyPaidPayment(String merchantUid, String transactionId) {
+        // This method always starts in a new transaction.
+        
+        // 1. Update Database (change order status to PAID, etc.)
+        Order order = orderRepository.findByOrderId(merchantUid)
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + merchantUid)); // (translation: Order not found:)
+        
+        Payment payment = paymentRepository.findByOrder_OrderId(merchantUid).orElseGet(() -> {
+            log.info("결제 정보가 없어 새로 생성합니다: {}", merchantUid); // (translation: Creating new payment info as none exists:)
+            Payment newPayment = Payment.createPayment(
+                    merchantUid,
+                    order,
+                    "UNKNOWN", // 웹훅에서는 상세 정보 제한적 (translation: Limited detail info from webhook)
+                    order.getTotalAmount()
+            );
+            return paymentRepository.save(newPayment);
+        });
+
+        orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
+        order.markAsPaidNow();
+        order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
+        payment.updateStatus(PaymentStatus.PAID);
+        payment.updatePgTransactionId(transactionId);
+        payment.updatePaidAt(LocalDateTime.now());
+        
+        log.info("주문 및 결제 상태 PAID로 업데이트 완료: {}", merchantUid); // (translation: Order and payment status updated to PAID:)
+
+        // 2. Make External API Calls and Publish Kafka Message
+        try {
+            ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
+            String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: "Store")
+            
+            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(order.getStoreId());
+            
+            if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
+                Long ownerId = ownerIdResponse.getData();
+                OrderNotificationEvent forOwner = OrderNotificationEvent.createNewOrderNotificationForOwner(
+                        order.getOrderId(), ownerId, storeName);
+                kafkaMessageProducer.publishOrderNotificationEvent(forOwner);
+                log.info("점주에게 신규 주문 알림 발행 성공. Order: {}, Owner ID: {}", order.getOrderId(), ownerId); // (translation: Successfully published new order notification to owner.)
+            } else {
+                log.error("점주 ID 조회 실패. 알림 미발송. StoreId: {}", order.getStoreId()); // (translation: Failed to get owner ID. Notification not sent.)
+            }
+        } catch (Exception e) {
+            log.error("점주 알림 발행 중 예외 발생. Order: {}", merchantUid, e); // (translation: Exception occurred while publishing owner notification.)
+        }
     }
 
     private void cancelMismatchedPayment(String transactionId, String merchantUid) {
