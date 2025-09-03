@@ -71,11 +71,10 @@ public class HealthCheckController {
             @Parameter(description = "Store ID to test", required = true, example = "1037")
             @PathVariable Long storeId) {
         
-        Long testUserId = 1L; // 테스트용 사용자 ID (translation: Test user ID)
-        log.info("[FEIGN-TEST] storeClient.getOwnerIdByStoreId({}, {}) 호출을 시작합니다.", storeId, testUserId); // (translation: Starting call to storeClient.getOwnerIdByStoreId({}, {}))
+        log.info("[FEIGN-TEST] storeClient.getOwnerIdByStoreId({}) 호출을 시작합니다.", storeId); // (translation: Starting call to storeClient.getOwnerIdByStoreId({}))
         
         try {
-            ApiResponseDto<Long> response = storeClient.getOwnerIdByStoreId(storeId, testUserId);
+            ApiResponseDto<Long> response = storeClient.getOwnerIdByStoreId(storeId);
             
             log.info("[FEIGN-TEST] 호출 성공. 응답: {}", response);
             if (response != null) {

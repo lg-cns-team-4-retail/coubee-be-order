@@ -28,7 +28,7 @@ public class FeignClientTester implements ApplicationRunner {
         log.info("======================================================================");
 
         try {
-            ApiResponseDto<Long> response = storeClient.getOwnerIdByStoreId(testStoreId, testUserId);
+            ApiResponseDto<Long> response = storeClient.getOwnerIdByStoreId(testStoreId);
             
             log.info("[FEIGN-STARTUP-TEST] FeignClient 호출 성공!");
             if (response != null) {
