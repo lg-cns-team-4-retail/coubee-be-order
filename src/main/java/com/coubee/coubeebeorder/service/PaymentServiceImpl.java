@@ -30,12 +30,10 @@ import io.portone.sdk.server.payment.PaymentMethod;
 import io.portone.sdk.server.payment.PaidPayment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.context.annotation.Lazy; // ★★★ Lazy import 추가 ★★★
 
 import java.util.List;
 import java.util.UUID;
@@ -59,13 +57,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentClient portonePaymentClient;
     private final StoreClient storeClient;
     private final ProductClient productClient;
-
-    private PaymentServiceImpl self; // ★★★ (translation: Add a field for self-injection)
-
-    @Autowired
-    public void setSelf(@Lazy PaymentServiceImpl self) { // ★★★ 파라미터에 @Lazy 어노테이션 추가 ★★★
-        this.self = self;
-    }
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -197,8 +189,8 @@ public class PaymentServiceImpl implements PaymentService {
                 
                 log.info("주문 및 결제 상태 PAID로 업데이트 완료: {}", merchantUid); // (translation: Order and payment status updated to PAID:)
                 
-                // 2. After DB logic is complete, call the notification method via the self-proxy.
-                self.notifyOwner(order.getOrderId(), order.getStoreId(), order.getUserId());
+                // 2. After DB logic is complete, publish an event to notify the owner.
+                eventPublisher.publishEvent(new OrderPaidEvent(order.getOrderId(), order.getStoreId(), order.getUserId()));
                 
                 return true;
             } else if ("Transaction.Ready".equals(eventType)) {
@@ -357,38 +349,12 @@ public class PaymentServiceImpl implements PaymentService {
         // (This ensures the order data already exists when updateOrderStatusWithHistory queries the DB, preventing a NotFound exception.)
         orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
 
-        // 8. After DB logic, call the notification method via the self-proxy.
-        self.notifyOwner(order.getOrderId(), order.getStoreId(), order.getUserId());
+        // 8. After DB logic, publish an event. The listener will handle the notification.
+        eventPublisher.publishEvent(new OrderPaidEvent(order.getOrderId(), order.getStoreId(), order.getUserId()));
 
         return orderId;
     }
 
-    // ★★★ (translation: Add this new method for notifications) ★★★
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void notifyOwner(String orderId, Long storeId, Long userId) {
-        log.info("새로운 트랜잭션에서 점주 알림을 시작합니다. Order ID: {}", orderId); // (translation: Starting owner notification in a new transaction. Order ID: {})
-        try {
-            // This method focuses only on external calls, using data passed as arguments.
-            ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(storeId, userId);
-            String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: "Store")
-            
-            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(storeId);
-            
-            if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
-                Long ownerId = ownerIdResponse.getData();
-                OrderNotificationEvent forOwner = OrderNotificationEvent.createNewOrderNotificationForOwner(
-                        orderId, ownerId, storeName);
-                kafkaMessageProducer.publishOrderNotificationEvent(forOwner);
-                log.info("점주에게 신규 주문 알림 발행 성공. Order: {}, Owner ID: {}", orderId, ownerId); // (translation: Successfully published new order notification to owner.)
-            } else {
-                log.error("점주 ID 조회 실패. 알림 미발송. StoreId: {}", storeId); // (translation: Failed to get owner ID. Notification not sent.)
-            }
-        } catch (Exception e) {
-            // If an exception occurs here, the main order transaction is already safely committed.
-            // We can log this error for monitoring or add to a retry queue.
-            log.error("점주 알림 발행 중 최종 예외 발생. Order: {}", orderId, e); // (translation: Final exception occurred while publishing owner notification.)
-        }
-    }
 
     private void cancelMismatchedPayment(String transactionId, String merchantUid) {
         try {
