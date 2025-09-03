@@ -19,27 +19,17 @@ public class FeignConfig {
      * In Kubernetes environment, these timeouts should account for network latency
      * and service startup times
      */
-    @Bean
+    @Bean("commonRequestOptions")
     public Request.Options requestOptions() {
-        return new Request.Options(
-                5000, TimeUnit.MILLISECONDS,  // Connect timeout: 5 seconds
-                10000, TimeUnit.MILLISECONDS, // Read timeout: 10 seconds
-                true                          // Follow redirects
-        );
+        return new Request.Options(5000, TimeUnit.MILLISECONDS, 10000, TimeUnit.MILLISECONDS, true);
     }
 
-    /**
-     * Configure Feign logging level
-     * BASIC level logs request method, URL, response status, and execution time
-     */
-    @Bean
+    @Bean("commonFeignLoggerLevel")
     public Logger.Level feignLoggerLevel() {
         return Logger.Level.BASIC;
     }
 
-    /**
-     * Custom error decoder to handle product service errors gracefully
-     */
+    // ProductClient만을 위한 에러 디코더이므로 그대로 둡니다.
     @Bean
     public ErrorDecoder errorDecoder() {
         return new ProductServiceErrorDecoder();

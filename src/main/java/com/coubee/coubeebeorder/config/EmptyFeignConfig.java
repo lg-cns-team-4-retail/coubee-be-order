@@ -15,18 +15,15 @@ import java.util.concurrent.TimeUnit;
 public class EmptyFeignConfig {
 
     // 기존 FeignConfig의 타임아웃과 로깅 설정은 그대로 가져옵니다.
-    @Bean
+     // ★★★ Bean 이름을 명시적으로 지정하여 중복을 피합니다. ★★★
+    @Bean("storeClientRequestOptions")
     public Request.Options requestOptions() {
-        return new Request.Options(
-                5000, TimeUnit.MILLISECONDS,  // Connect timeout: 5 seconds
-                10000, TimeUnit.MILLISECONDS, // Read timeout: 10 seconds
-                true                          // Follow redirects
-        );
+        return new Request.Options(5000, TimeUnit.MILLISECONDS, 10000, TimeUnit.MILLISECONDS, true);
     }
 
-    @Bean
+    @Bean("storeClientFeignLoggerLevel")
     public Logger.Level feignLoggerLevel() {
-        return Logger.Level.FULL; // ★★★ 디버깅을 위해 로깅 레벨을 FULL로 변경하여 헤더까지 확인
+        return Logger.Level.FULL;
     }
     
     // ★★★ 핵심: 기존 FeignConfig와 달리, 헤더를 추가하는 인터셉터나 에러 디코더 Bean을 여기에 등록하지 않습니다.
