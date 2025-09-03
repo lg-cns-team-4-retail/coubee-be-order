@@ -279,9 +279,17 @@ public class PaymentServiceImpl implements PaymentService {
         // (Create order data with the fetched product information)
         String orderId = "test_order_" + java.util.UUID.randomUUID().toString().replace("-", "");
         String recipientName = "Test User";
-
-        Order order = Order.createOrder(orderId, request.getUserId(), request.getStoreId(), totalOriginAmount, totalDiscountAmount, finalPaymentAmount, recipientName);
-        OrderItem item = OrderItem.createOrderItem(product.getProductId(), product.getProductName(), request.getQuantity(), product.getSalePrice());
+        
+        // store-service에서 storeName을 가져옵니다.
+        // (translation: Fetch storeName from the store-service.)
+        com.coubee.coubeebeorder.common.dto.ApiResponseDto<com.coubee.coubeebeorder.remote.store.StoreResponseDto> storeResponse = storeClient.getStoreById(request.getStoreId(), request.getUserId());
+        if (storeResponse == null || storeResponse.getData() == null) {
+            throw new com.coubee.coubeebeorder.common.exception.NotFound("Test failed: Store not found with ID: " + request.getStoreId());
+        }
+        String storeName = storeResponse.getData().getStoreName();
+        
+        Order order = Order.createOrder(orderId, request.getUserId(), request.getStoreId(), storeName, totalOriginAmount, totalDiscountAmount, finalPaymentAmount, recipientName);
+        OrderItem item = OrderItem.createOrderItem(product.getProductId(), product.getProductName(), product.getDescription(), request.getQuantity(), product.getSalePrice());
         order.addOrderItem(item);
 
         // 4. 결제 데이터 생성

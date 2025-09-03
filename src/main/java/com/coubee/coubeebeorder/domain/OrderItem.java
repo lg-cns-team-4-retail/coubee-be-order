@@ -28,6 +28,9 @@ public class OrderItem extends BaseTimeEntity {
     @Column(name = "product_name", nullable = false, length = 255)
     private String productName;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Column(nullable = false)
     private Integer quantity;
 
@@ -42,20 +45,22 @@ public class OrderItem extends BaseTimeEntity {
     private Boolean wasHotdeal = false;
 
     @Builder
-    private OrderItem(Order order, Long productId, String productName, Integer quantity, Integer price, EventType eventType, Boolean wasHotdeal) {
+    private OrderItem(Order order, Long productId, String productName, String description, Integer quantity, Integer price, EventType eventType, Boolean wasHotdeal) {
         this.order = order;
         this.productId = productId;
         this.productName = productName;
+        this.description = description;
         this.quantity = quantity;
         this.price = price;
         this.eventType = eventType;
         this.wasHotdeal = wasHotdeal != null ? wasHotdeal : false;
     }
 
-    public static OrderItem createOrderItem(Long productId, String productName, Integer quantity, Integer price) {
+    public static OrderItem createOrderItem(Long productId, String productName, String description, Integer quantity, Integer price) {
         return OrderItem.builder()
                 .productId(productId)
                 .productName(productName)
+                .description(description)
                 .quantity(quantity)
                 .price(price)
                 .eventType(EventType.PURCHASE) // 기본값으로 PURCHASE 설정
@@ -73,10 +78,11 @@ public class OrderItem extends BaseTimeEntity {
      * @param eventType 이벤트 타입
      * @return 생성된 주문 아이템
      */
-    public static OrderItem createOrderItemWithEventType(Long productId, String productName, Integer quantity, Integer price, EventType eventType) {
+    public static OrderItem createOrderItemWithEventType(Long productId, String productName, String description, Integer quantity, Integer price, EventType eventType) {
         return OrderItem.builder()
                 .productId(productId)
                 .productName(productName)
+                .description(description)
                 .quantity(quantity)
                 .price(price)
                 .eventType(eventType)
@@ -95,10 +101,11 @@ public class OrderItem extends BaseTimeEntity {
      * @param wasHotdeal whether this item was purchased during a hotdeal
      * @return created order item
      */
-    public static OrderItem createOrderItemWithHotdeal(Long productId, String productName, Integer quantity, Integer price, EventType eventType, Boolean wasHotdeal) {
+    public static OrderItem createOrderItemWithHotdeal(Long productId, String productName, String description, Integer quantity, Integer price, EventType eventType, Boolean wasHotdeal) {
         return OrderItem.builder()
                 .productId(productId)
                 .productName(productName)
+                .description(description)
                 .quantity(quantity)
                 .price(price)
                 .eventType(eventType)

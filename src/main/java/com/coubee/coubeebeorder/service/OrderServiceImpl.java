@@ -63,6 +63,14 @@ public class OrderServiceImpl implements OrderService {
         log.info("Creating order for user: {}", userId);
 
         String orderId = "order_" + UUID.randomUUID().toString().replace("-", "");
+        
+        // 상점 정보를 조회하여 상점 이름을 가져옵니다.
+        // (translation: Fetch store information to get the store name.)
+        ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(request.getStoreId(), userId);
+        if (storeResponse == null || storeResponse.getData() == null) {
+            throw new NotFound("Store not found with ID: " + request.getStoreId());
+        }
+        String storeName = storeResponse.getData().getStoreName();
 
         // 상품 정보를 가져오고 원가, 판매가, 상품별 할인액을 계산합니다.
         // (Fetch product information and calculate origin price, sale price, and product-specific discounts.)
@@ -156,20 +164,22 @@ public class OrderServiceImpl implements OrderService {
         // (Calculate the final payment amount (total sale amount - hotdeal discount).)
         int finalPaymentAmount = totalSaleAmount - hotdealDiscountAmount;
 
-        // 새로운 비즈니스 로직에 따라 주문을 생성합니다.
-        // (Create order according to the new business logic.)
+        // 새로운 비즈니스 로직에 따라 주문을 생성합니다. (storeName 추가)
+        // (translation: Create order according to the new business logic (with storeName added).)
         Order order = Order.createOrder(
-                orderId, userId, request.getStoreId(), totalOriginAmount, totalDiscountAmount, finalPaymentAmount, request.getRecipientName());
+                orderId, userId, request.getStoreId(), storeName, totalOriginAmount, totalDiscountAmount, finalPaymentAmount, request.getRecipientName());
 
         // Add order items with real product data and hotdeal status
         for (int i = 0; i < request.getItems().size(); i++) {
             OrderCreateRequest.OrderItemRequest itemRequest = request.getItems().get(i);
             ProductResponseDto product = productDetails.get(i);
 
-            // Create order item with hotdeal status
+            // 주문 아이템 추가 루프 수정 (description 추가)
+            // (translation: Modify order item creation loop (with description added).)
             OrderItem orderItem = OrderItem.createOrderItemWithHotdeal(
                     itemRequest.getProductId(),
                     product.getProductName(),
+                    product.getDescription(), // Add product description here
                     itemRequest.getQuantity(),
                     product.getSalePrice(),
                     EventType.PURCHASE,

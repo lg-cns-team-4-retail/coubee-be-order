@@ -28,11 +28,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             SELECT DISTINCT o.order_id, o.created_at
             FROM coubee_order.orders o
             WHERE o.user_id = :userId
-            AND (:keyword IS NULL OR EXISTS (
-                SELECT 1 FROM coubee_order.order_items oi
-                WHERE oi.order_id = o.order_id
-                AND LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-            ))
+            AND (
+                :keyword IS NULL OR :keyword = '' OR
+                LOWER(o.store_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                EXISTS (
+                    SELECT 1 FROM coubee_order.order_items oi
+                    WHERE oi.order_id = o.order_id
+                    AND (
+                        LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                        LOWER(oi.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    )
+                )
+            )
             ORDER BY o.created_at DESC
             LIMIT :#{#pageable.pageSize} OFFSET :#{#pageable.offset}
             """,
@@ -40,11 +47,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             SELECT COUNT(DISTINCT o.order_id)
             FROM coubee_order.orders o
             WHERE o.user_id = :userId
-            AND (:keyword IS NULL OR EXISTS (
-                SELECT 1 FROM coubee_order.order_items oi
-                WHERE oi.order_id = o.order_id
-                AND LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-            ))
+            AND (
+                :keyword IS NULL OR :keyword = '' OR
+                LOWER(o.store_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                EXISTS (
+                    SELECT 1 FROM coubee_order.order_items oi
+                    WHERE oi.order_id = o.order_id
+                    AND (
+                        LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                        LOWER(oi.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    )
+                )
+            )
             """,
            nativeQuery = true)
     Page<Object[]> findUserOrderIdsNative(@Param("userId") Long userId,

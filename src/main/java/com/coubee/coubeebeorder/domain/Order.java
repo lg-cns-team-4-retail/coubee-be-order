@@ -32,6 +32,9 @@ public class Order extends BaseTimeEntity {
     @Column(name = "store_id", nullable = false)
     private Long storeId;
 
+    @Column(name = "store_name")
+    private String storeName;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status;
@@ -63,10 +66,11 @@ public class Order extends BaseTimeEntity {
     private List<OrderTimestamp> statusHistory = new ArrayList<>();
 
     @Builder
-    private Order(String orderId, Long userId, Long storeId, OrderStatus status, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName, Long paidAtUnix) {
+    private Order(String orderId, Long userId, Long storeId, String storeName, OrderStatus status, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName, Long paidAtUnix) {
         this.orderId = orderId;
         this.userId = userId;
         this.storeId = storeId;
+        this.storeName = storeName;
         this.status = status;
         this.originalAmount = originalAmount;
         this.discountAmount = discountAmount != null ? discountAmount : 0;
@@ -75,11 +79,12 @@ public class Order extends BaseTimeEntity {
         this.paidAtUnix = paidAtUnix;
     }
 
-    public static Order createOrder(String orderId, Long userId, Long storeId, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName) {
+    public static Order createOrder(String orderId, Long userId, Long storeId, String storeName, Integer originalAmount, Integer discountAmount, Integer totalAmount, String recipientName) {
         return Order.builder()
                 .orderId(orderId)
                 .userId(userId)
                 .storeId(storeId)
+                .storeName(storeName)
                 .status(OrderStatus.PENDING)
                 .originalAmount(originalAmount)
                 .discountAmount(discountAmount)
@@ -90,7 +95,7 @@ public class Order extends BaseTimeEntity {
 
     // Backward compatibility method for existing code
     public static Order createOrder(String orderId, Long userId, Long storeId, Integer totalAmount, String recipientName) {
-        return createOrder(orderId, userId, storeId, totalAmount, 0, totalAmount, recipientName);
+        return createOrder(orderId, userId, storeId, null, totalAmount, 0, totalAmount, recipientName);
     }
 
     public void addOrderItem(OrderItem item) {
