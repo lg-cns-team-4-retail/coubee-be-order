@@ -20,27 +20,32 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderId(String orderId);
 
     /**
-     * Native query to fetch paginated order IDs with explicit type casting to avoid lower(bytea) error
-     * Returns order_id and created_at to satisfy PostgreSQL SELECT DISTINCT / ORDER BY requirements
+     * Native query to fetch paginated order IDs.
+     * The explicit CAST to VARCHAR has been removed as the underlying schema is now correct.
+     * Returns order_id and created_at to satisfy PostgreSQL SELECT DISTINCT / ORDER BY requirements.
      */
-    @Query(value = "SELECT DISTINCT o.order_id, o.created_at " +
-                   "FROM coubee_order.orders o " +
-                   "WHERE o.user_id = :userId " +
-                   "AND (:keyword IS NULL OR EXISTS (" +
-                   "    SELECT 1 FROM coubee_order.order_items oi " +
-                   "    WHERE oi.order_id = o.order_id " +
-                   "    AND LOWER(CAST(oi.product_name AS VARCHAR)) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
-                   ")) " +
-                   "ORDER BY o.created_at DESC " +
-                   "LIMIT :#{#pageable.pageSize} OFFSET :#{#pageable.offset}",
-           countQuery = "SELECT COUNT(DISTINCT o.order_id) " +
-                        "FROM coubee_order.orders o " +
-                        "WHERE o.user_id = :userId " +
-                        "AND (:keyword IS NULL OR EXISTS (" +
-                        "    SELECT 1 FROM coubee_order.order_items oi " +
-                        "    WHERE oi.order_id = o.order_id " +
-                        "    AND LOWER(CAST(oi.product_name AS VARCHAR)) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
-                        "))",
+    @Query(value = """
+            SELECT DISTINCT o.order_id, o.created_at
+            FROM coubee_order.orders o
+            WHERE o.user_id = :userId
+            AND (:keyword IS NULL OR EXISTS (
+                SELECT 1 FROM coubee_order.order_items oi
+                WHERE oi.order_id = o.order_id
+                AND LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            ))
+            ORDER BY o.created_at DESC
+            LIMIT :#{#pageable.pageSize} OFFSET :#{#pageable.offset}
+            """,
+           countQuery = """
+            SELECT COUNT(DISTINCT o.order_id)
+            FROM coubee_order.orders o
+            WHERE o.user_id = :userId
+            AND (:keyword IS NULL OR EXISTS (
+                SELECT 1 FROM coubee_order.order_items oi
+                WHERE oi.order_id = o.order_id
+                AND LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            ))
+            """,
            nativeQuery = true)
     Page<Object[]> findUserOrderIdsNative(@Param("userId") Long userId,
                                           @Param("keyword") String keyword,
