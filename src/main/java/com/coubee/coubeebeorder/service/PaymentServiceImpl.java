@@ -173,8 +173,33 @@ public class PaymentServiceImpl implements PaymentService {
             if ("Transaction.Paid".equals(eventType)) {
                 log.info("Transaction.Paid 이벤트 처리 - 결제 완료 상태로 업데이트");
                 
-                // ★★★ (translation: Key Change: Call the new method via the 'self' proxy) ★★★
-                self.processAndNotifyPaidPayment(merchantUid, transactionId);
+                // 1. Perform all DB updates first within this primary transaction.
+                Order order = orderRepository.findByOrderId(merchantUid)
+                        .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다: " + merchantUid)); // (translation: Order not found:)
+                
+                Payment payment = paymentRepository.findByOrder_OrderId(merchantUid).orElseGet(() -> {
+                    log.info("결제 정보가 없어 새로 생성합니다: {}", merchantUid); // (translation: Creating new payment info as none exists:)
+                    Payment newPayment = Payment.createPayment(
+                            merchantUid,
+                            order,
+                            "UNKNOWN", // 웹훅에서는 상세 정보 제한적 (translation: Limited detail info from webhook)
+                            order.getTotalAmount()
+                    );
+                    return paymentRepository.save(newPayment);
+                });
+                
+                orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
+                order.markAsPaidNow();
+                order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
+                payment.updateStatus(PaymentStatus.PAID);
+                payment.updatePgTransactionId(transactionId);
+                payment.updatePaidAt(LocalDateTime.now());
+                
+                log.info("주문 및 결제 상태 PAID로 업데이트 완료: {}", merchantUid); // (translation: Order and payment status updated to PAID:)
+                
+                // 2. After DB logic is complete, call the notification method via the self-proxy.
+                self.notifyOwner(order.getOrderId(), order.getStoreId(), order.getUserId());
+                
                 return true;
             } else if ("Transaction.Ready".equals(eventType)) {
                 log.info("Transaction.Ready 이벤트 처리 - 결제 준비 상태");
@@ -332,60 +357,36 @@ public class PaymentServiceImpl implements PaymentService {
         // (This ensures the order data already exists when updateOrderStatusWithHistory queries the DB, preventing a NotFound exception.)
         orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
 
-        // 8. ★★★ (translation: Key Change: Call the new method for notification, not the old one) ★★★
-        String mockTransactionId = "test-tx-id-" + order.getOrderId();
-        self.processAndNotifyPaidPayment(order.getOrderId(), mockTransactionId);
+        // 8. After DB logic, call the notification method via the self-proxy.
+        self.notifyOwner(order.getOrderId(), order.getStoreId(), order.getUserId());
 
         return orderId;
     }
 
-    // ★★★ (translation: Add the new method below) ★★★
+    // ★★★ (translation: Add this new method for notifications) ★★★
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void processAndNotifyPaidPayment(String merchantUid, String transactionId) {
-        // This method always starts in a new transaction.
-        
-        // 1. Update Database (change order status to PAID, etc.)
-        Order order = orderRepository.findByOrderId(merchantUid)
-                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + merchantUid)); // (translation: Order not found:)
-        
-        Payment payment = paymentRepository.findByOrder_OrderId(merchantUid).orElseGet(() -> {
-            log.info("결제 정보가 없어 새로 생성합니다: {}", merchantUid); // (translation: Creating new payment info as none exists:)
-            Payment newPayment = Payment.createPayment(
-                    merchantUid,
-                    order,
-                    "UNKNOWN", // 웹훅에서는 상세 정보 제한적 (translation: Limited detail info from webhook)
-                    order.getTotalAmount()
-            );
-            return paymentRepository.save(newPayment);
-        });
-
-        orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
-        order.markAsPaidNow();
-        order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
-        payment.updateStatus(PaymentStatus.PAID);
-        payment.updatePgTransactionId(transactionId);
-        payment.updatePaidAt(LocalDateTime.now());
-        
-        log.info("주문 및 결제 상태 PAID로 업데이트 완료: {}", merchantUid); // (translation: Order and payment status updated to PAID:)
-
-        // 2. Make External API Calls and Publish Kafka Message
+    public void notifyOwner(String orderId, Long storeId, Long userId) {
+        log.info("새로운 트랜잭션에서 점주 알림을 시작합니다. Order ID: {}", orderId); // (translation: Starting owner notification in a new transaction. Order ID: {})
         try {
-            ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
+            // This method focuses only on external calls, using data passed as arguments.
+            ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(storeId, userId);
             String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: "Store")
             
-            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(order.getStoreId());
+            ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(storeId);
             
             if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
                 Long ownerId = ownerIdResponse.getData();
                 OrderNotificationEvent forOwner = OrderNotificationEvent.createNewOrderNotificationForOwner(
-                        order.getOrderId(), ownerId, storeName);
+                        orderId, ownerId, storeName);
                 kafkaMessageProducer.publishOrderNotificationEvent(forOwner);
-                log.info("점주에게 신규 주문 알림 발행 성공. Order: {}, Owner ID: {}", order.getOrderId(), ownerId); // (translation: Successfully published new order notification to owner.)
+                log.info("점주에게 신규 주문 알림 발행 성공. Order: {}, Owner ID: {}", orderId, ownerId); // (translation: Successfully published new order notification to owner.)
             } else {
-                log.error("점주 ID 조회 실패. 알림 미발송. StoreId: {}", order.getStoreId()); // (translation: Failed to get owner ID. Notification not sent.)
+                log.error("점주 ID 조회 실패. 알림 미발송. StoreId: {}", storeId); // (translation: Failed to get owner ID. Notification not sent.)
             }
         } catch (Exception e) {
-            log.error("점주 알림 발행 중 예외 발생. Order: {}", merchantUid, e); // (translation: Exception occurred while publishing owner notification.)
+            // If an exception occurs here, the main order transaction is already safely committed.
+            // We can log this error for monitoring or add to a retry queue.
+            log.error("점주 알림 발행 중 최종 예외 발생. Order: {}", orderId, e); // (translation: Final exception occurred while publishing owner notification.)
         }
     }
 
@@ -402,104 +403,6 @@ public class PaymentServiceImpl implements PaymentService {
 
     
 
-    private boolean processWebhookBasedPayment(String merchantUid, String transactionId, PortoneWebhookPayload payload) {
-        try {
-            log.info("웹훅 기반 결제 처리 시작 - merchantUid: {}, transactionId: {}", merchantUid, transactionId);
-            
-            // 주문 조회
-            Order order = orderRepository.findByOrderId(merchantUid)
-                    .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + merchantUid));
-            
-            // 결제 정보 조회 또는 생성
-            Payment payment = paymentRepository.findByOrder_OrderId(merchantUid)
-                    .orElseGet(() -> {
-                        log.info("결제 정보가 없어 새로 생성합니다: {}", merchantUid);
-                        Payment newPayment = Payment.createPayment(
-                                merchantUid,
-                                order,
-                                "UNKNOWN", // 웹훅에서는 상세 정보 제한적
-                                order.getTotalAmount()
-                        );
-                        return paymentRepository.save(newPayment);
-                    });
-            
-            // 결제 상태 업데이트
-            payment.updateStatus(PaymentStatus.PAID);
-            payment.updatePgTransactionId(transactionId);
-            payment.updatePaidAt(LocalDateTime.now());
-
-            // paymentRepository.save(payment); // Redundant call removed - managed entity changes are automatically persisted
-
-            // 주문 상태 업데이트
-            orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
-
-            // V3: 결제 완료 시점을 UNIX 타임스탬프로 설정
-            order.markAsPaidNow();
-
-            // V3: 모든 주문 아이템의 이벤트 타입을 PURCHASE로 설정
-            order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
-
-            // orderRepository.save(order); // Redundant call removed - managed entity changes are automatically persisted
-
-            // Kafka 이벤트 발행
-            publishPaymentCompletedEvent(order, payment);
-            
-            log.info("웹훅 기반 결제 처리 완료 - merchantUid: {}, transactionId: {}", merchantUid, transactionId);
-            return true;
-            
-        } catch (Exception e) {
-            log.error("웹훅 기반 결제 처리 중 오류 발생 - merchantUid: {}, transactionId: {}", merchantUid, transactionId, e);
-            return false;
-        }
-    }
-
-    private void publishPaymentCompletedEvent(Order order, Payment payment) {
-        try {
-            // [수정] StoreClient를 통해 매장 정보를 조회합니다. (translation: [MODIFIED] Fetch store information via StoreClient.)
-            ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
-            String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장"; // (translation: "Store")
-
-            // 1. [CHANGE] Remove or comment out the existing logic that sends a "Payment Completed" notification to the customer.
-            /* 
-            OrderNotificationEvent forCustomer = OrderNotificationEvent.createPaidNotification(
-                    order.getOrderId(),
-                    order.getUserId(), // ★ 알림 수신 대상을 고객 ID로 설정 (translation: ★ Set recipient to customer's userId)
-                    storeName
-            );
-            kafkaMessageProducer.publishOrderNotificationEvent(forCustomer);
-            log.info("Payment completion notification published (to Customer) - Order: {}, Customer: {}", order.getOrderId(), order.getUserId());
-            */
-
-            // 2. [ADD] Add new logic to send a "New Order" notification to the store owner.
-            try {
-                log.info("[DEBUG] StoreClient 호출 시작. storeId: {}. getOwnerIdByStoreId 메소드를 호출합니다.", order.getStoreId());
-                // Call the StoreClient to get the owner's userId
-                ApiResponseDto<Long> ownerIdResponse = storeClient.getOwnerIdByStoreId(order.getStoreId());
-                log.info("[DEBUG] StoreClient 호출 완료. 응답: {}", ownerIdResponse);
-                if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
-                    Long ownerId = ownerIdResponse.getData();
-
-                    // Create the notification event for the owner
-                    OrderNotificationEvent forOwner = OrderNotificationEvent.createNewOrderNotificationForOwner(
-                            order.getOrderId(),
-                            ownerId, // Set the recipient to the owner's ID
-                            storeName
-                    );
-
-                    // Publish the Kafka message
-                    kafkaMessageProducer.publishOrderNotificationEvent(forOwner);
-                    log.info("New order notification published (to Store Owner) - Order: {}, Owner ID: {}", order.getOrderId(), ownerId);
-                } else {
-                    log.error("Failed to get ownerId for storeId: {}. Notification to owner was not sent. Response: {}", order.getStoreId(), ownerIdResponse);
-                }
-            } catch (Exception e) {
-                log.error("Error while sending new order notification to store owner for order: {}", order.getOrderId(), e);
-            }
-
-        } catch (Exception e) {
-            log.error("Failed to publish payment completion notification event - Order: {}", order.getOrderId(), e);
-        }
-    }
 
     private String getStoreName(Long storeId, Long userId) {
         try {
