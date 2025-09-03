@@ -1,11 +1,14 @@
 package com.coubee.coubeebeorder.api.backend;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
+import com.coubee.coubeebeorder.remote.store.StoreClient;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,7 +21,7 @@ import java.util.Map;
 @RequestMapping("/api/health")
 @RequiredArgsConstructor
 public class HealthCheckController {
-
+    private final StoreClient storeClient; // ★★★ StoreClient 주입
     @Operation(summary = "Health Check", description = "Returns service health status")
     @GetMapping
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> healthCheck() {
@@ -57,4 +60,30 @@ public class HealthCheckController {
         status.put("message", "Service is alive");
         return ResponseEntity.ok(status);
     }
+
+    // ★★★★★ 아래 테스트용 엔드포인트를 추가합니다. ★★★★★
+    @Operation(summary = "[Test] Get Owner ID by Store ID", description = "Tests the Feign client call to get an owner ID from the store service.")
+    @GetMapping("/test/store/{storeId}/owner")
+    public ApiResponseDto<Long> testGetOwnerIdByStoreId(
+            @Parameter(description = "Store ID to test", required = true, example = "1037")
+            @PathVariable Long storeId) {
+        
+        log.info("[FEIGN-TEST] storeClient.getOwnerIdByStoreId({}) 호출을 시작합니다.", storeId);
+        
+        try {
+            ApiResponseDto<Long> response = storeClient.getOwnerIdByStoreId(storeId);
+            
+            log.info("[FEIGN-TEST] 호출 성공. 응답: {}", response);
+            if (response != null) {
+                log.info("[FEIGN-TEST] 응답 코드: {}, 메시지: {}, 데이터: {}", response.getCode(), response.getMessage(), response.getData());
+            }
+            
+            return response;
+
+        } catch (Exception e) {
+            log.error("[FEIGN-TEST] FeignClient 호출 중 예외 발생!", e);
+            // 예외 발생 시, 에러 응답을 직접 생성하여 반환
+            return ApiResponseDto.createError("FEIGN_CLIENT_ERROR", e.getMessage());
+        }
+
 }
