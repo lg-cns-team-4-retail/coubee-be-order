@@ -22,6 +22,8 @@ public class OrderPaidEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderPaidEvent(OrderPaidEvent event) {
         log.info("주문 생성 트랜잭션 커밋 완료. 점주 알림을 시작합니다. Order ID: {}", event.orderId()); // (translation: Order creation transaction committed. Starting owner notification. Order ID:)
+        log.info("주문 생성 트랜잭션 커밋 완료. 점주 알림을 시작합니다. Order ID: {}", event.storeId()); // (translation: Order creation transaction committed. Starting owner notification. Order ID:)
+
         log.debug("이벤트 데이터: storeId={}, userId={}", event.storeId(), event.userId()); // (translation: Event data: storeId={}, userId={})
         
         try {
