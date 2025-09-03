@@ -35,6 +35,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -873,40 +874,27 @@ public class OrderServiceImpl implements OrderService {
         LocalDateTime startDateTime = effectiveStartDate.atStartOfDay();
         LocalDateTime endDateTime = effectiveEndDate.atTime(LocalTime.MAX);
 
-        // Calculate Summary: Get order counts by status
-        List<OrderCountByStatusProjection> statusCounts = orderRepository.countOrdersByStatusInPeriod(
+        // Initialize a map with all OrderStatus enums and a count of 0.
+        // This ensures a consistent response structure even if some statuses have no orders.
+        Map<String, Long> statusCountMap = Arrays.stream(OrderStatus.values())
+                .collect(Collectors.toMap(Enum::name, status -> 0L));
+
+        // Get order counts by status from the repository (this part is unchanged).
+        List<OrderCountByStatusProjection> statusCountsFromDb = orderRepository.countOrdersByStatusInPeriod(
                 storeId, startDateTime, endDateTime);
         
-        // Process results to calculate totals
+        // Populate the map with actual counts from the database and calculate the total.
         long totalOrderCount = 0;
-        long paidOrderCount = 0;
-        long receivedOrderCount = 0;
-        long canceledOrderCount = 0;
-
-        for (OrderCountByStatusProjection statusCount : statusCounts) {
-            String status = statusCount.getStatus();
-            Long count = statusCount.getOrderCount();
-            
-            totalOrderCount += count;
-            
-            switch (status) {
-                case "PAID", "PREPARING", "PREPARED", "RECEIVED" -> paidOrderCount += count;
-                case "CANCELLED" -> canceledOrderCount += count;
-            }
-            
-            // Count received orders separately
-            if ("RECEIVED".equals(status)) {
-                receivedOrderCount += count;
-            }
+        for (OrderCountByStatusProjection projection : statusCountsFromDb) {
+            statusCountMap.put(projection.getStatus(), projection.getOrderCount());
+            totalOrderCount += projection.getOrderCount();
         }
 
-        // Create order count summary
+        // Create the new, refactored order count summary object.
         StoreOrderSummaryResponseDto.OrderCountSummary orderCountSummary = 
                 StoreOrderSummaryResponseDto.OrderCountSummary.builder()
                         .totalOrderCount(totalOrderCount)
-                        .paidOrderCount(paidOrderCount)
-                        .receivedOrderCount(receivedOrderCount)
-                        .canceledOrderCount(canceledOrderCount)
+                        .statusCounts(statusCountMap)
                         .build();
 
         // Fetch Paginated List: Only if original dates were provided

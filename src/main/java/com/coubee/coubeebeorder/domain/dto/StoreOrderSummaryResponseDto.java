@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Page;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -35,16 +36,10 @@ public class StoreOrderSummaryResponseDto {
     @Schema(description = "Order count statistics grouped by status")
     public static class OrderCountSummary {
 
-        @Schema(description = "Total number of orders", example = "150")
+        @Schema(description = "Total number of orders in the period", example = "150")
         private Long totalOrderCount;
 
-        @Schema(description = "Number of paid orders (PAID, PREPARING, PREPARED, RECEIVED)", example = "120")
-        private Long paidOrderCount;
-
-        @Schema(description = "Number of received orders", example = "100")
-        private Long receivedOrderCount;
-
-        @Schema(description = "Number of canceled orders", example = "30")
-        private Long canceledOrderCount;
+        @Schema(description = "Detailed order counts by status. Key: status name (e.g., 'PAID'), Value: count")
+        private Map<String, Long> statusCounts;
     }
 }
