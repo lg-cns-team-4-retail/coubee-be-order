@@ -39,9 +39,9 @@ server:
 # Logging 설정
 logging:
   level:
-    com.coubee: INFO
-    org.springframework.web: INFO
-    org.hibernate.SQL: INFO
+    com.coubee: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: TRACE
 
 # PortOne API 설정
 portone:
