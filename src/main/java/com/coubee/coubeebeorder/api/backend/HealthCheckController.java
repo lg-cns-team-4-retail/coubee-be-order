@@ -4,8 +4,10 @@ import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/health")
 @RequiredArgsConstructor
+@Slf4j
 public class HealthCheckController {
     private final StoreClient storeClient; // ★★★ StoreClient 주입
     @Operation(summary = "Health Check", description = "Returns service health status")
@@ -83,7 +86,7 @@ public class HealthCheckController {
         } catch (Exception e) {
             log.error("[FEIGN-TEST] FeignClient 호출 중 예외 발생!", e);
             // 예외 발생 시, 에러 응답을 직접 생성하여 반환
-            return ApiResponseDto.createError("FEIGN_CLIENT_ERROR", e.getMessage());
+            return ApiResponseDto.createError("FEIGN_CLIENT_ERROR", e.getMessage(), null);
         }
-
+    }
 }
