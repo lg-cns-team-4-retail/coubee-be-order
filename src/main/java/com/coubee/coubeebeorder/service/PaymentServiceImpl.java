@@ -35,6 +35,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.annotation.Lazy; // ★★★ Lazy import 추가 ★★★
 
 import java.util.List;
 import java.util.UUID;
@@ -62,7 +63,7 @@ public class PaymentServiceImpl implements PaymentService {
     private PaymentServiceImpl self; // ★★★ (translation: Add a field for self-injection)
 
     @Autowired
-    public void setSelf(PaymentServiceImpl self) { // ★★★ (translation: Add a setter for self-injection)
+    public void setSelf(@Lazy PaymentServiceImpl self) { // ★★★ 파라미터에 @Lazy 어노테이션 추가 ★★★
         this.self = self;
     }
 
