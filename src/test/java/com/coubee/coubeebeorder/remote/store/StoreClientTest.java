@@ -62,7 +62,7 @@ class StoreClientTest {
 
         // Then
         assertThat(result).isNotNull();
-        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getCode()).isEqualTo("OK");
         assertThat(result.getData()).isNotNull();
         assertThat(result.getData().getStoreId()).isEqualTo(storeId);
         assertThat(result.getData().getStoreName()).isEqualTo("테스트 스토어");

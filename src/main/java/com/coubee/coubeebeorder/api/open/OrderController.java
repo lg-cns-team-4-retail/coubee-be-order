@@ -240,7 +240,6 @@ public class OrderController {
                 .code("OK")
                 .message("Order details retrieved successfully.")
                 .data(responseDto)
-                .success(true)
                 .build();
     }
 

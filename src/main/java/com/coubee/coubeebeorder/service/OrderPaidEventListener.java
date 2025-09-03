@@ -39,10 +39,9 @@ public class OrderPaidEventListener {
             log.info("test :{}",ownerIdResponse.getCode());
             log.info("test :{}",ownerIdResponse.getData());
             log.info("test: {}", ownerIdResponse.getMessage());
-            log.info("test: {}", ownerIdResponse.isSuccess());
             log.debug("점주 ID 조회 응답: {}", ownerIdResponse); // (translation: Owner ID lookup response: {})
 
-            if (ownerIdResponse != null && ownerIdResponse.isSuccess() && ownerIdResponse.getData() != null) {
+            if (ownerIdResponse != null && "OK".equals(ownerIdResponse.getCode()) && ownerIdResponse.getData() != null) {
                 Long ownerId = ownerIdResponse.getData();
                 OrderNotificationEvent forOwner = OrderNotificationEvent.createNewOrderNotificationForOwner(
                         event.orderId(), ownerId, storeName);
@@ -52,7 +51,7 @@ public class OrderPaidEventListener {
                 // 더 자세한 오류 정보 로깅 (translation: More detailed error logging)
                 if (ownerIdResponse == null) {
                     log.error("점주 ID 조회 실패: 응답이 null입니다. StoreId: {}, UserId: {}", event.storeId(), event.userId()); // (translation: Owner ID lookup failed: response is null. StoreId: {}, UserId: {})
-                } else if (!ownerIdResponse.isSuccess()) {
+                } else if (!"OK".equals(ownerIdResponse.getCode())) {
                     log.error("점주 ID 조회 실패: API 응답 실패. StoreId: {}, UserId: {}, Code: {}, Message: {}", 
                             event.storeId(), event.userId(), ownerIdResponse.getCode(), ownerIdResponse.getMessage()); // (translation: Owner ID lookup failed: API response failed. StoreId: {}, UserId: {}, Code: {}, Message: {})
                 } else {
