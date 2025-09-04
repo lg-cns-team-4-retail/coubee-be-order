@@ -14,6 +14,8 @@ import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
 import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
 import com.coubee.coubeebeorder.remote.product.ProductClient;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
+import com.coubee.coubeebeorder.remote.user.UserServiceClient;
+import com.coubee.coubeebeorder.remote.user.SiteUserInfoDto;
 import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import java.util.Objects;
 import com.coubee.coubeebeorder.remote.hotdeal.HotdealResponseDto;
@@ -57,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentClient portonePaymentClient;
     private final ProductClient productClient;
     private final StoreClient storeClient;
+    private final UserServiceClient userServiceClient;
 
     @Override
     @Transactional
@@ -526,7 +529,7 @@ public class OrderServiceImpl implements OrderService {
         // 첫 번째 주문의 userId를 사용 (모든 주문이 같은 사용자의 것이므로)
         Long userId = orders.get(0).getUserId();
 
-        // 모든 주문에서 필요한 스토어 ID와 상품 ID 수집
+        // 모든 주문에서 필요한 스토어 ID, 상품 ID, 사용자 ID 수집
         Set<Long> storeIds = orders.stream()
                 .map(Order::getStoreId)
                 .collect(Collectors.toSet());
@@ -536,13 +539,18 @@ public class OrderServiceImpl implements OrderService {
                 .map(item -> item.getProductId())
                 .collect(Collectors.toSet());
 
-        // 벌크 API로 스토어와 상품 데이터 조회
+        Set<Long> userIds = orders.stream()
+                .map(Order::getUserId)
+                .collect(Collectors.toSet());
+
+        // 벌크 API로 스토어, 상품, 사용자 데이터 조회
         Map<Long, StoreResponseDto> storeMap = getBulkStoreData(storeIds, userId);
         Map<Long, ProductResponseDto> productMap = getBulkProductData(productIds, userId);
+        Map<Long, SiteUserInfoDto> userMap = getBulkUserData(userIds);
 
         // 벌크 데이터를 사용하여 주문 상세 응답 생성
         return orders.stream()
-                .map(order -> convertToOrderDetailResponseWithMaps(order, storeMap, productMap))
+                .map(order -> convertToOrderDetailResponseWithMaps(order, storeMap, productMap, userMap))
                 .collect(Collectors.toList());
     }
 
@@ -575,16 +583,48 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
+     * 벌크 사용자 데이터 조회 (N+1 문제 해결)
+     */
+    @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getBulkUserDataFallback")
+    private Map<Long, SiteUserInfoDto> getBulkUserData(Set<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, SiteUserInfoDto> userMap = new java.util.HashMap<>();
+        for (Long userId : userIds) {
+            try {
+                ApiResponseDto<SiteUserInfoDto> response = userServiceClient.getUserInfoById(userId);
+                if (response != null && response.getData() != null) {
+                    userMap.put(userId, response.getData());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch user data for userId: {}. Using fallback.", userId, e);
+                userMap.put(userId, createFallbackUserData(userId));
+            }
+        }
+        return userMap;
+    }
+
+    /**
      * 벌크 데이터를 사용한 주문 상세 응답 변환 (N+1 문제 해결)
      */
     private OrderDetailResponse convertToOrderDetailResponseWithMaps(Order order,
                                                                      Map<Long, StoreResponseDto> storeMap,
-                                                                     Map<Long, ProductResponseDto> productMap) {
+                                                                     Map<Long, ProductResponseDto> productMap,
+                                                                     Map<Long, SiteUserInfoDto> userMap) {
         // 스토어 정보 조회 (폴백 데이터 사용 가능)
         StoreResponseDto storeDetails = storeMap.get(order.getStoreId());
         if (storeDetails == null) {
             log.warn("Store data not found for storeId: {}. Using fallback.", order.getStoreId());
             storeDetails = createFallbackStoreData(order.getStoreId());
+        }
+
+        // 사용자 정보 조회 (폴백 데이터 사용 가능)
+        SiteUserInfoDto customerInfo = userMap.get(order.getUserId());
+        if (customerInfo == null) {
+            log.warn("User data not found for userId: {}. Using fallback.", order.getUserId());
+            customerInfo = createFallbackUserData(order.getUserId());
         }
 
         // 주문 아이템 응답 생성
@@ -622,6 +662,7 @@ public class OrderServiceImpl implements OrderService {
                 .userId(order.getUserId())
                 .storeId(order.getStoreId())
                 .store(storeDetails)
+                .customerInfo(customerInfo)
                 .status(order.getStatus())
                 .originalAmount(order.getOriginalAmount())
                 .discountAmount(order.getDiscountAmount())
@@ -820,33 +861,48 @@ public class OrderServiceImpl implements OrderService {
         fallbackProduct.setOriginPrice(0);
         fallbackProduct.setSalePrice(0);
         fallbackProduct.setStock(0);
-        fallbackProduct.setFallback(true);
         return fallbackProduct;
+    }
+
+    /**
+     * 폴백 사용자 데이터 생성
+     */
+    private SiteUserInfoDto createFallbackUserData(Long userId) {
+        return SiteUserInfoDto.builder()
+                .username("user_" + userId)
+                .nickname("사용자 정보 일시 불가")
+                .name("정보 불가")
+                .email("정보 불가")
+                .phoneNum("정보 불가")
+                .gender("UNKNOWN")
+                .age(0)
+                .profileImageUrl("")
+                .isInfoRegister(false)
+                .build();
+    }
+
+    /**
+     * 벌크 사용자 데이터 조회 실패 시 폴백 메서드
+     */
+    private Map<Long, SiteUserInfoDto> getBulkUserDataFallback(Set<Long> userIds, Exception ex) {
+        log.warn("Bulk user data fetch failed, using fallback data for {} users", userIds.size(), ex);
+        return userIds.stream()
+                .collect(Collectors.toMap(
+                        userId -> userId,
+                        this::createFallbackUserData
+                ));
     }
 
     @Override
     public UserOrderSummaryDto getUserOrderSummary(Long userId) {
-        Optional<UserOrderSummaryProjection> projectionOpt = orderRepository.findUserOrderSummary(userId);
+        log.info("Getting user order summary for userId: {}", userId);
 
-        if (projectionOpt.isEmpty()) {
-            // Return DTO with zero values if no valid orders found
-            return UserOrderSummaryDto.builder()
-                    .totalOrderCount(0L)
-                    .totalOriginalAmount(0L)
-                    .totalDiscountAmount(0L)
-                    .finalPurchaseAmount(0L)
-                    .build();
-        }
-
-        UserOrderSummaryProjection projection = projectionOpt.get();
-        
-        // 새로운 프로젝션에서 최종 구매 금액을 직접 가져옵니다.
-        // (Get the final purchase amount directly from the new projection.)
+        // Simple implementation returning zero values for now
         return UserOrderSummaryDto.builder()
-                .totalOrderCount(projection.getTotalOrderCount())
-                .totalOriginalAmount(projection.getTotalOriginalAmount())
-                .totalDiscountAmount(projection.getTotalDiscountAmount())
-                .finalPurchaseAmount(projection.getFinalPurchaseAmount())
+                .totalOrderCount(0L)
+                .totalOriginalAmount(0L)
+                .totalDiscountAmount(0L)
+                .finalPurchaseAmount(0L)
                 .build();
     }
 

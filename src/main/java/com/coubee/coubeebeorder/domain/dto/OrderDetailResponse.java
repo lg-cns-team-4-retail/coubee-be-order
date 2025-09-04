@@ -3,6 +3,7 @@ package com.coubee.coubeebeorder.domain.dto;
 import com.coubee.coubeebeorder.domain.OrderStatus;
 import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import com.coubee.coubeebeorder.remote.store.StoreResponseDto;
+import com.coubee.coubeebeorder.remote.user.SiteUserInfoDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -52,6 +53,9 @@ public class OrderDetailResponse {
 
     @Schema(description = "Store details")
     private StoreResponseDto store;
+
+    @Schema(description = "Customer information")
+    private SiteUserInfoDto customerInfo;
 
     @Schema(description = "Order item list")
     private List<OrderItemResponse> items;

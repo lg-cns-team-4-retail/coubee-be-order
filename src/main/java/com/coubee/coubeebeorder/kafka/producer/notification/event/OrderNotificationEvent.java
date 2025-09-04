@@ -111,7 +111,7 @@ public class OrderNotificationEvent {
     public static OrderNotificationEvent createNewOrderNotificationForOwner(String orderId, Long ownerId, String storeName) {
         return OrderNotificationEvent.builder()
                 .eventId(UUID.randomUUID().toString())
-                .notificationType("NEW_ORDER") // 점주를 위한 새로운 알림 타입 (translation: A new notification type for the store owner)
+                .notificationType("PAID") // 점주를 위한 새로운 알림 타입 (translation: A new notification type for the store owner)
                 .orderId(orderId)
                 .userId(ownerId) // ★★★ 알림 수신 대상을 점주 ID로 설정 (translation: ★★★ Set the notification recipient to the owner's ID)
                 .title("신규 주문 접수") // (translation: New Order Received)
