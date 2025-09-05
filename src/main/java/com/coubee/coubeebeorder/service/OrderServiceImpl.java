@@ -55,7 +55,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderTimestampRepository orderTimestampRepository;
     private final ProductStockService productStockService;
     private final KafkaMessageProducer kafkaMessageProducer;
-    // ✅✅✅ FeignClient 대신 공식 SDK 클라이언트를 주입받습니다. ✅✅✅
+    // FeignClient 대신 공식 SDK 클라이언트를 주입받습니다
     private final PaymentClient portonePaymentClient;
     private final ProductClient productClient;
     private final StoreClient storeClient;
@@ -68,16 +68,14 @@ public class OrderServiceImpl implements OrderService {
 
         String orderId = "order_" + UUID.randomUUID().toString().replace("-", "");
         
-        // 상점 정보를 조회하여 상점 이름을 가져옵니다.
-        // (translation: Fetch store information to get the store name.)
+        // 상점 정보를 조회하여 상점 이름을 가져옵니다
         ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(request.getStoreId(), userId);
         if (storeResponse == null || storeResponse.getData() == null) {
             throw new NotFound("Store not found with ID: " + request.getStoreId());
         }
         String storeName = storeResponse.getData().getStoreName();
 
-        // 상품 정보를 가져오고 원가, 판매가, 상품별 할인액을 계산합니다.
-        // (Fetch product information and calculate origin price, sale price, and product-specific discounts.)
+        // 상품 정보를 가져오고 원가, 판매가, 상품별 할인액을 계산합니다
         int totalOriginAmount = 0;
         int totalSaleAmount = 0;
         int productDiscountAmount = 0;
@@ -85,7 +83,7 @@ public class OrderServiceImpl implements OrderService {
 
         for (OrderCreateRequest.OrderItemRequest itemRequest : request.getItems()) {
             try {
-                // Call product service to get product details
+                // 상품 서비스를 호출하여 상품 상세 정보 조회
                 log.debug("Fetching product details for productId: {}", itemRequest.getProductId());
                 ApiResponseDto<ProductResponseDto> productResponse = productClient.getProductById(
                         itemRequest.getProductId(), userId);
@@ -96,7 +94,7 @@ public class OrderServiceImpl implements OrderService {
 
                 ProductResponseDto product = productResponse.getData();
 
-                // Check if product has sufficient stock
+                // 상품 재고가 충분한지 확인
                 if (product.getStock() < itemRequest.getQuantity()) {
                     throw new ApiError("Insufficient stock for product: " + product.getProductName() +
                                      ". Available: " + product.getStock() + ", Requested: " + itemRequest.getQuantity());
@@ -104,8 +102,7 @@ public class OrderServiceImpl implements OrderService {
 
                 int quantity = itemRequest.getQuantity();
                 
-                // 원가와 판매가를 각각 계산합니다.
-                // (Calculate origin price and sale price separately.)
+                // 원가와 판매가를 각각 계산합니다
                 totalOriginAmount += product.getOriginPrice() * quantity;
                 totalSaleAmount += product.getSalePrice() * quantity;
 
@@ -125,12 +122,10 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 상품 자체 할인액(원가 - 판매가)을 계산합니다.
-        // (Calculate product-specific discount amount (origin price - sale price).)
+        // 상품 자체 할인액(원가 - 판매가)을 계산합니다
         productDiscountAmount = totalOriginAmount - totalSaleAmount;
 
-        // 핫딜 할인을 확인하고 추적합니다.
-        // (Check for active hotdeal and track hotdeal status.)
+        // 핫딜 할인을 확인하고 추적합니다
         int hotdealDiscountAmount = 0;
         boolean isHotdealActive = false;
 
@@ -144,8 +139,7 @@ public class OrderServiceImpl implements OrderService {
                 log.info("Active hotdeal found for storeId: {}, saleRate: {}, maxDiscount: {}",
                         request.getStoreId(), hotdeal.getSaleRate(), hotdeal.getMaxDiscount());
 
-                // 핫딜 할인은 판매가 총액을 기준으로 계산합니다.
-                // (Hotdeal discount is calculated based on the total sale amount.)
+                // 핫딜 할인은 판매가 총액을 기준으로 계산합니다
                 double calculatedDiscount = totalSaleAmount * hotdeal.getSaleRate();
                 hotdealDiscountAmount = (int) Math.min(calculatedDiscount, hotdeal.getMaxDiscount());
 
@@ -157,33 +151,29 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             log.warn("Failed to fetch hotdeal information for storeId: {}, proceeding without discount. Error: {}",
                     request.getStoreId(), e.getMessage());
-            // Continue without discount if hotdeal service fails
+            // 핫딜 서비스 실패 시 할인 없이 계속 진행
         }
 
-        // 상품 자체 할인액(원가 - 판매가)과 핫딜 할인을 합산하여 최종 총 할인액을 계산합니다.
-        // (Calculate the final total discount amount by summing the product-specific discount and the hotdeal discount.)
+        // 상품 자체 할인액(원가 - 판매가)과 핫딜 할인을 합산하여 최종 총 할인액을 계산합니다
         int totalDiscountAmount = productDiscountAmount + hotdealDiscountAmount;
         
-        // 최종 결제 금액을 계산합니다 (판매가 총액 - 핫딜 할인액).
-        // (Calculate the final payment amount (total sale amount - hotdeal discount).)
+        // 최종 결제 금액을 계산합니다 (판매가 총액 - 핫딜 할인액)
         int finalPaymentAmount = totalSaleAmount - hotdealDiscountAmount;
 
-        // 새로운 비즈니스 로직에 따라 주문을 생성합니다. (storeName 추가)
-        // (translation: Create order according to the new business logic (with storeName added).)
+        // 새로운 비즈니스 로직에 따라 주문을 생성합니다 (storeName 추가)
         Order order = Order.createOrder(
                 orderId, userId, request.getStoreId(), storeName, totalOriginAmount, totalDiscountAmount, finalPaymentAmount, request.getRecipientName());
 
-        // Add order items with real product data and hotdeal status
+        // 실제 상품 데이터와 핫딜 상태로 주문 아이템 추가
         for (int i = 0; i < request.getItems().size(); i++) {
             OrderCreateRequest.OrderItemRequest itemRequest = request.getItems().get(i);
             ProductResponseDto product = productDetails.get(i);
 
             // 주문 아이템 추가 루프 수정 (description 추가)
-            // (translation: Modify order item creation loop (with description added).)
             OrderItem orderItem = OrderItem.createOrderItemWithHotdeal(
                     itemRequest.getProductId(),
                     product.getProductName(),
-                    product.getDescription(), // Add product description here
+                    product.getDescription(), // 상품 설명 추가
                     itemRequest.getQuantity(),
                     product.getSalePrice(),
                     EventType.PURCHASE,
@@ -192,7 +182,7 @@ public class OrderServiceImpl implements OrderService {
             order.addOrderItem(orderItem);
         }
 
-        // Record initial status history (PENDING)
+        // 초기 상태 이력 기록 (PENDING)
         OrderTimestamp initialTimestamp = OrderTimestamp.createTimestamp(order, OrderStatus.PENDING);
         order.addStatusHistory(initialTimestamp);
 
@@ -218,7 +208,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다. Order ID: " + orderId));
 
-        // Determine the new cancel status based on user role
+        // 사용자 역할에 따라 새로운 취소 상태 결정
         OrderStatus newCancelStatus;
         if ("ROLE_ADMIN".equals(userRole) || "ROLE_SUPER_ADMIN".equals(userRole)) {
             newCancelStatus = OrderStatus.CANCELLED_ADMIN;
@@ -228,16 +218,16 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("주문을 취소할 권한이 없습니다.");
         }
 
-        // Check if the order is already cancelled or received
+        // 주문이 이미 취소되었거나 수령되었는지 확인
         if (order.getStatus() == OrderStatus.CANCELLED_USER || order.getStatus() == OrderStatus.CANCELLED_ADMIN || order.getStatus() == OrderStatus.RECEIVED) {
             throw new InvalidStatusTransitionException(order.getStatus(), newCancelStatus);
         }
 
         if (order.getPayment() != null && order.getPayment().getStatus() == PaymentStatus.PAID) {
             try {
-                // ✅✅✅ 공식 SDK를 사용하여 결제를 취소합니다. ✅✅✅
-                // TODO: Implement proper cancellation when CancelPaymentRequest is available
-                // transactionId는 Payment 테이블에 저장된 pg_transaction_id를 사용해야 합니다.
+                // 공식 SDK를 사용하여 결제를 취소합니다
+                // TODO: CancelPaymentRequest가 사용 가능할 때 적절한 취소 구현
+                // transactionId는 Payment 테이블에 저장된 pg_transaction_id를 사용해야 합니다
                 String transactionId = order.getPayment().getPgTransactionId();
 
                 if (transactionId == null || transactionId.isBlank()) {
@@ -262,7 +252,7 @@ public class OrderServiceImpl implements OrderService {
 
         updateOrderStatusAndCreateHistory(order, newCancelStatus);
 
-        // V3: 주문 취소 시 모든 주문 아이템의 이벤트 타입을 REFUND로 설정
+        // 주문 취소 시 모든 주문 아이템의 이벤트 타입을 REFUND로 설정
         order.getItems().forEach(item -> item.updateEventType(EventType.REFUND));
 
         // orderRepository.save(order); // Redundant call removed - managed entity changes are automatically persisted
@@ -305,7 +295,7 @@ public class OrderServiceImpl implements OrderService {
     public Page<OrderDetailResponse> getUserOrders(Long userId, Pageable pageable, String keyword) {
         log.info("Getting user orders - userId: {}, pageable: {}, keyword: {}", userId, pageable, keyword);
 
-        // Step 1: Fetch paginated order data using native query with explicit type casting
+        // 1단계: 명시적 타입 캐스팅을 사용하여 네이티브 쿼리로 페이지네이션된 주문 데이터 조회
         Page<Object[]> orderDataPage = orderRepository.findUserOrderIdsNative(userId, keyword, pageable);
 
         if (orderDataPage.isEmpty()) {

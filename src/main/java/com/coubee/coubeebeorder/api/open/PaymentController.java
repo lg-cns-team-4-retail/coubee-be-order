@@ -21,7 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/order/payment")
 @RequiredArgsConstructor
-@Tag(name = "Payment", description = "결제 관련 API")
+@Tag(name = "결제", description = "결제 관련 API")
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -74,14 +74,14 @@ public class PaymentController {
     }
 
     @PostMapping("/test/payment-completed")
-    @Operation(summary = "결제 완료 이벤트 테스트 (주문 자동 생성) (translation: Payment Completed Event Test (Auto-creates order))", description = "요청된 상품 정보로 주문을 자동 생성하고, 결제 완료 상태로 만든 후 알림 이벤트를 발행합니다. (translation: Automatically creates an order with the requested product info, sets it to 'completed payment' status, and then publishes a notification event.)")
+    @Operation(summary = "결제 완료 이벤트 테스트 (주문 자동 생성)", description = "요청된 상품 정보로 주문을 자동 생성하고, 결제 완료 상태로 만든 후 알림 이벤트를 발행합니다.")
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> testPaymentCompletedEvent(
-            @jakarta.validation.Valid @RequestBody com.coubee.coubeebeorder.domain.dto.TestOrderCreateRequest request) { // @RequestParam -> @RequestBody로 변경 (translation: Changed from @RequestParam to @RequestBody)
+            @jakarta.validation.Valid @RequestBody com.coubee.coubeebeorder.domain.dto.TestOrderCreateRequest request) { // @RequestParam -> @RequestBody로 변경
 
         log.info("Payment completed event test requested - Request: {}", request);
 
         try {
-            // 수정된 서비스 메소드 호출 (translation: Call the modified service method)
+            // 수정된 서비스 메소드 호출
             String testOrderId = paymentService.createAndCompleteTestOrder(request);
 
             Map<String, Object> result = Map.of(

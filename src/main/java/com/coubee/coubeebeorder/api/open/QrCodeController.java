@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/order/qr")
 @RequiredArgsConstructor
-@Tag(name = "QR Code", description = "QR 코드 생성 API")
+@Tag(name = "QR 코드", description = "QR 코드 생성 API")
 public class QrCodeController {
 
     private final QrCodeService qrCodeService;

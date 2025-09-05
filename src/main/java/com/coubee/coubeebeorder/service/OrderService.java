@@ -35,43 +35,43 @@ public interface OrderService {
     OrderStatusUpdateResponse updateOrderStatus(String orderId, OrderStatusUpdateRequest request, Long userId);
 
     /**
-     * Updates order status with history tracking (for internal service use)
+     * 주문 상태를 변경하고 이력을 기록합니다 (내부 서비스용)
      *
-     * @param orderId the order ID
-     * @param newStatus the new status
+     * @param orderId 주문 ID
+     * @param newStatus 새로운 주문 상태
      */
     void updateOrderStatusWithHistory(String orderId, OrderStatus newStatus);
 
     /**
-     * Get user order summary aggregation (for backend services)
+     * 사용자 주문 요약 정보를 조회합니다 (백엔드 서비스용)
      *
-     * @param userId the user ID
-     * @return user order summary containing aggregated statistics
+     * @param userId 사용자 ID
+     * @return 집계된 통계를 포함한 사용자 주문 요약 정보
      */
     UserOrderSummaryDto getUserOrderSummary(Long userId);
 
     /**
-     * Get store order summary with statistics and paginated order list
+     * 매장 주문 요약 정보와 페이지네이션된 주문 목록을 조회합니다
      *
-     * @param ownerUserId the store owner user ID
-     * @param storeId the store ID
-     * @param startDate start date for the summary period (optional)
-     * @param endDate end date for the summary period (optional)
-     * @param pageable pagination information
-     * @return store order summary response containing statistics and detailed order list
+     * @param ownerUserId 매장 소유자 사용자 ID
+     * @param storeId 매장 ID
+     * @param startDate 요약 기간 시작일 (선택사항)
+     * @param endDate 요약 기간 종료일 (선택사항)
+     * @param pageable 페이지네이션 정보
+     * @return 통계와 상세 주문 목록을 포함한 매장 주문 요약 응답
      */
     StoreOrderSummaryResponseDto getStoreOrderSummary(Long ownerUserId, Long storeId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
-    // [ADD] New method signature for getting a store's orders.
+    // 매장의 주문 목록을 조회하기 위한 새로운 메소드
     Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, String keyword, Pageable pageable);
 
     /**
-     * Get nearby bestseller products based on geographical coordinates
+     * 지리적 좌표를 기반으로 주변 베스트셀러 상품을 조회합니다
      *
-     * @param latitude latitude coordinate
-     * @param longitude longitude coordinate
-     * @param pageable pagination information
-     * @return paginated list of bestseller products from nearby stores
+     * @param latitude 위도 좌표
+     * @param longitude 경도 좌표
+     * @param pageable 페이지네이션 정보
+     * @return 주변 매장의 베스트셀러 상품 페이지네이션 목록
      */
     Page<BestsellerProductResponseDto> getNearbyBestsellers(double latitude, double longitude, Pageable pageable);
 }

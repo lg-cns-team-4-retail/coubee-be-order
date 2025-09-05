@@ -39,11 +39,11 @@ public class OrderTimestamp {
     }
 
     /**
-     * Creates a new OrderTimestamp with the current timestamp
+     * 현재 시간으로 새로운 OrderTimestamp를 생성합니다
      *
-     * @param order the order this timestamp belongs to
-     * @param status the status at this timestamp
-     * @return new OrderTimestamp instance
+     * @param order 이 타임스탬프가 속한 주문
+     * @param status 이 시점의 상태
+     * @return 새로운 OrderTimestamp 인스턴스
      */
     public static OrderTimestamp createTimestamp(Order order, OrderStatus status) {
         return OrderTimestamp.builder()
@@ -54,12 +54,12 @@ public class OrderTimestamp {
     }
 
     /**
-     * Creates a new OrderTimestamp with a specific timestamp
+     * 특정 시간으로 새로운 OrderTimestamp를 생성합니다
      *
-     * @param order the order this timestamp belongs to
-     * @param status the status at this timestamp
-     * @param updatedAt the specific timestamp
-     * @return new OrderTimestamp instance
+     * @param order 이 타임스탬프가 속한 주문
+     * @param status 이 시점의 상태
+     * @param updatedAt 특정 타임스탬프
+     * @return 새로운 OrderTimestamp 인스턴스
      */
     public static OrderTimestamp createTimestamp(Order order, OrderStatus status, LocalDateTime updatedAt) {
         return OrderTimestamp.builder()

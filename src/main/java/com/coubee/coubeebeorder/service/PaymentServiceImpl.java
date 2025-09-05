@@ -7,7 +7,7 @@ import com.coubee.coubeebeorder.domain.EventType;
 import com.coubee.coubeebeorder.domain.Order;
 import com.coubee.coubeebeorder.domain.OrderItem;
 import com.coubee.coubeebeorder.domain.OrderStatus;
-// ✅ [수정] 우리 도메인 Payment는 명시적으로 import 합니다.
+// 우리 도메인 Payment는 명시적으로 import 합니다
 import com.coubee.coubeebeorder.domain.Payment;
 import com.coubee.coubeebeorder.domain.PaymentStatus;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyRequest;
@@ -40,7 +40,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.time.LocalDateTime;
 
-@Slf4j // ✅ [추가] @Slf4j 어노테이션 추가
+@Slf4j // @Slf4j 어노테이션 추가
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

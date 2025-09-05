@@ -15,13 +15,13 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-@Tag(name = "Health Check API", description = "APIs for service health monitoring")
+@Tag(name = "헬스 체크 API", description = "서비스 상태 모니터링을 위한 API")
 @RestController
 @RequestMapping("/api/health")
 @RequiredArgsConstructor
 @Slf4j
 public class HealthCheckController {
-    @Operation(summary = "Health Check", description = "Returns service health status")
+    @Operation(summary = "헬스 체크", description = "서비스 상태 정보를 반환합니다")
     @GetMapping
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> healthCheck() {
         Map<String, Object> healthInfo = new HashMap<>();
@@ -35,7 +35,7 @@ public class HealthCheckController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Readiness Check", description = "Returns service readiness status")
+    @Operation(summary = "준비 상태 체크", description = "서비스 준비 상태를 반환합니다")
     @GetMapping("/ready")
     public ResponseEntity<Map<String, String>> readinessCheck() {
         Map<String, String> status = new HashMap<>();
@@ -51,7 +51,7 @@ public class HealthCheckController {
         }
     }
 
-    @Operation(summary = "Liveness Check", description = "Returns service liveness status")
+    @Operation(summary = "생존 상태 체크", description = "서비스 생존 상태를 반환합니다")
     @GetMapping("/live")
     public ResponseEntity<Map<String, String>> livenessCheck() {
         Map<String, String> status = new HashMap<>();

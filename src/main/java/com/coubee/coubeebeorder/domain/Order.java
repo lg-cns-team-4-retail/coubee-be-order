@@ -93,7 +93,7 @@ public class Order extends BaseTimeEntity {
                 .build();
     }
 
-    // Backward compatibility method for existing code
+    // 기존 코드와의 하위 호환성을 위한 메소드
     public static Order createOrder(String orderId, Long userId, Long storeId, Integer totalAmount, String recipientName) {
         return createOrder(orderId, userId, storeId, null, totalAmount, 0, totalAmount, recipientName);
     }

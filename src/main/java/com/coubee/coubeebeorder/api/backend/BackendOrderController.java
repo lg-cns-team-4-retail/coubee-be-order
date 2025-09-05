@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Backend Order API", description = "Internal APIs for inter-service communication")
+@Tag(name = "백엔드 주문 API", description = "서비스 간 내부 통신을 위한 API")
 @RestController
 @RequestMapping("/backend/order")
 @RequiredArgsConstructor
@@ -20,10 +20,10 @@ public class BackendOrderController {
 
     private final OrderService orderService;
 
-    @Operation(summary = "Get User Order Summary (For Backend)", description = "Retrieves order summary for a specific user ID.")
+    @Operation(summary = "사용자 주문 요약 조회 (백엔드용)", description = "특정 사용자 ID의 주문 요약 정보를 조회합니다")
     @GetMapping("/users/{userId}/summary")
     public ApiResponseDto<UserOrderSummaryDto> getUserOrderSummary(
-            @Parameter(description = "User ID") @PathVariable Long userId) {
+            @Parameter(description = "사용자 ID") @PathVariable Long userId) {
         UserOrderSummaryDto response = orderService.getUserOrderSummary(userId);
         return ApiResponseDto.readOk(response);
     }

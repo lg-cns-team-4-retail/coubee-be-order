@@ -37,7 +37,7 @@ public class OrderItem extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer price;
 
-    // @Enumerated(EnumType.STRING) // This annotation has been removed.
+    // @Enumerated(EnumType.STRING) // 이 어노테이션은 제거되었습니다
     @Column(name = "event_type")
     private EventType eventType;
 
@@ -91,15 +91,16 @@ public class OrderItem extends BaseTimeEntity {
     }
 
     /**
-     * Create order item with hotdeal status
+     * 핫딜 상태를 포함하여 주문 아이템을 생성합니다
      *
-     * @param productId product ID
-     * @param productName product name
-     * @param quantity quantity
-     * @param price price
-     * @param eventType event type
-     * @param wasHotdeal whether this item was purchased during a hotdeal
-     * @return created order item
+     * @param productId 상품 ID
+     * @param productName 상품명
+     * @param description 상품 설명
+     * @param quantity 수량
+     * @param price 가격
+     * @param eventType 이벤트 타입
+     * @param wasHotdeal 이 아이템이 핫딜 기간 중에 구매되었는지 여부
+     * @return 생성된 주문 아이템
      */
     public static OrderItem createOrderItemWithHotdeal(Long productId, String productName, String description, Integer quantity, Integer price, EventType eventType, Boolean wasHotdeal) {
         return OrderItem.builder()

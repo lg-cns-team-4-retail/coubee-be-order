@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
-@Tag(name = "Order API", description = "APIs for creating, retrieving, and cancelling orders")
+@Tag(name = "주문 API", description = "주문 생성, 조회, 취소를 위한 API")
 @RestController
 @RequestMapping("/api/order")
 @RequiredArgsConstructor
@@ -46,12 +46,12 @@ public class OrderController {
     private final StoreSecurityService storeSecurityService;
     private final UserServiceClient userServiceClient;
 
-    @Operation(summary = "Create Order", description = "Creates a new order and prepares payment")
+    @Operation(summary = "주문 생성", description = "새로운 주문을 생성하고 결제를 준비합니다")
     @PostMapping("/orders")
     @ResponseStatus(HttpStatus.CREATED)
-    // Add these two annotations
-    @Timed(value = "order.creation.time", description = "Time taken to create an order")
-    @Counted(value = "order.creation.count", description = "Number of orders created")
+    // 주문 생성 메트릭 수집을 위한 어노테이션
+    @Timed(value = "order.creation.time", description = "주문 생성 소요 시간")
+    @Counted(value = "order.creation.count", description = "생성된 주문 수")
     public ApiResponseDto<OrderCreateResponse> createOrder(
             @Valid @RequestBody OrderCreateRequest request) {
 
@@ -62,7 +62,7 @@ public class OrderController {
         return ApiResponseDto.createOk(response);
     }
 
-    @Operation(summary = "Get Order Details", description = "Retrieves order details by order ID")
+    @Operation(summary = "주문 상세 조회", description = "주문 ID로 주문 상세 정보를 조회합니다")
     @GetMapping("/orders/{orderId}")
     public ApiResponseDto<OrderDetailResponse> getOrder(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
@@ -71,7 +71,7 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get Order Status", description = "Retrieves the current status of an order by order ID")
+    @Operation(summary = "주문 상태 조회", description = "주문 ID로 현재 주문 상태를 조회합니다")
     @GetMapping("/orders/status/{orderId}")
     public ApiResponseDto<OrderStatusResponse> getOrderStatus(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
@@ -80,14 +80,14 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get My Orders", description = "Retrieves detailed order list for authenticated user. Can be filtered by keyword.")
+    @Operation(summary = "내 주문 목록 조회", description = "인증된 사용자의 상세 주문 목록을 조회합니다. 키워드로 필터링 가능합니다.")
     @GetMapping("/users/me/orders")
     public ApiResponseDto<Page<OrderDetailResponse>> getMyOrders(
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "Search keyword for product name", example = "bacon")
+            @Parameter(description = "상품명 검색 키워드", example = "베이컨")
             @RequestParam(required = false) String keyword) {
 
         // 컨트롤러가 직접 헤더에서 userId를 가져옵니다.
@@ -98,7 +98,7 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get My Order Summary", description = "Retrieves order summary (total amounts, counts) for the authenticated user.")
+    @Operation(summary = "내 주문 요약 조회", description = "인증된 사용자의 주문 요약 정보(총액, 건수)를 조회합니다.")
     @GetMapping("/users/me/summary")
     public ApiResponseDto<UserOrderSummaryDto> getMyOrderSummary() {
 
@@ -109,7 +109,7 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Cancel Order", description = "Cancels an order and refunds payment")
+    @Operation(summary = "주문 취소", description = "주문을 취소하고 결제를 환불합니다")
     @PostMapping("/orders/{orderId}/cancel")
     public ApiResponseDto<OrderDetailResponse> cancelOrder(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
@@ -125,7 +125,7 @@ public class OrderController {
         return ApiResponseDto.createOk(response);
     }
 
-    @Operation(summary = "Receive Order", description = "Marks an order as received by the customer")
+    @Operation(summary = "주문 수령 확인", description = "고객이 주문을 수령했음을 표시합니다")
     @PostMapping("/orders/{orderId}/receive")
     public ApiResponseDto<OrderDetailResponse> receiveOrder(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
@@ -134,7 +134,7 @@ public class OrderController {
         return ApiResponseDto.createOk(response);
     }
 
-    @Operation(summary = "Update Order Status", description = "Updates order status (Store owners only)")
+    @Operation(summary = "주문 상태 변경", description = "주문 상태를 변경합니다 (매장 소유자만 가능)")
     @PatchMapping("/orders/{orderId}")
     public ApiResponseDto<OrderStatusUpdateResponse> updateOrderStatus(
             @Parameter(description = "Order ID", required = true, example = "order_01H1J5BFXCZDMG8RP0WCTFSN5Y")
@@ -146,30 +146,30 @@ public class OrderController {
         // 컨트롤러가 직접 헤더에서 userId를 가져옵니다.
         Long userId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
 
-        // Validate user has permission to update order status
+        // 사용자가 주문 상태 변경 권한이 있는지 확인
         if (!"ROLE_ADMIN".equals(userRole) && !"ROLE_SUPER_ADMIN".equals(userRole)) {
-            throw new IllegalArgumentException("Only admins and super admins can update order status");
+            throw new IllegalArgumentException("관리자와 최고 관리자만 주문 상태를 변경할 수 있습니다");
         }
 
         OrderStatusUpdateResponse response = orderService.updateOrderStatus(orderId, request, userId);
         return ApiResponseDto.updateOk(response, "Order status has been updated");
     }
 
-    @Operation(summary = "Get Store Order Summary", description = "Retrieves order summary statistics and paginated order list for store owners")
+    @Operation(summary = "매장 주문 요약 조회", description = "매장 소유자를 위한 주문 요약 통계와 페이지네이션된 주문 목록을 조회합니다")
     @GetMapping("/stores/{storeId}/orders/summary")
     public ApiResponseDto<StoreOrderSummaryResponseDto> getStoreOrderSummary(
-            @Parameter(description = "Store ID", required = true, example = "1")
+            @Parameter(description = "매장 ID", required = true, example = "1")
             @PathVariable Long storeId,
-            @Parameter(description = "Start date for summary period", example = "2023-06-01")
+            @Parameter(description = "요약 기간 시작일", example = "2023-06-01")
             @RequestParam(required = false) LocalDate startDate,
-            @Parameter(description = "End date for summary period", example = "2023-06-30")
+            @Parameter(description = "요약 기간 종료일", example = "2023-06-30")
             @RequestParam(required = false) LocalDate endDate,
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
 
-        // Retrieve owner user ID from X-Auth-UserId header
+        // X-Auth-UserId 헤더에서 소유자 사용자 ID 가져오기
         Long ownerUserId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
 
         PageRequest pageRequest = PageRequest.of(page, size);
@@ -179,22 +179,22 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    // [ADD] New endpoint for store owners to view their orders.
-    @Operation(summary = "Get Store Orders", description = "Retrieves a paginated list of orders for a specific store, optionally filtered by status and keyword, sorted by oldest first. (Store Owner only)")
+    // 매장 소유자가 자신의 주문을 조회하기 위한 새로운 엔드포인트
+    @Operation(summary = "매장 주문 목록 조회", description = "특정 매장의 페이지네이션된 주문 목록을 조회합니다. 상태와 키워드로 필터링 가능하며, 최신순으로 정렬됩니다. (매장 소유자만 가능)")
     @GetMapping("/stores/{storeId}/orders")
     public ApiResponseDto<Page<OrderDetailResponse>> getStoreOrders(
-            @Parameter(description = "ID of the store to retrieve orders for", required = true)
+            @Parameter(description = "인증에서 가져온 사용자 역할", hidden = true)
             @PathVariable Long storeId,
-            @Parameter(description = "Filter orders by status (e.g., PAID, PREPARING, RECEIVED)")
+            @Parameter(description = "상태별 주문 필터링 (예: PAID, PREPARING, RECEIVED)")
             @RequestParam(required = false) OrderStatus status,
-            @Parameter(description = "Search keyword for store name, product name, or product description")
+            @Parameter(description = "매장명, 상품명, 상품 설명 검색 키워드")
             @RequestParam(required = false) String keyword,
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
 
-        // (translation: Get owner ID from header.)
+        // 헤더에서 소유자 ID 가져오기
         Long ownerUserId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
         PageRequest pageRequest = PageRequest.of(page, size);
 
@@ -202,40 +202,33 @@ public class OrderController {
         return ApiResponseDto.readOk(response);
     }
 
-    @Operation(summary = "Get Store Order Details", description = "Retrieves detailed information of a specific order for authenticated store owner")
+    @Operation(summary = "매장 주문 상세 조회", description = "인증된 매장 소유자를 위한 특정 주문의 상세 정보를 조회합니다")
     @GetMapping("/stores/{storeId}/orders/{orderId}")
     public ApiResponseDto<OrderDetailResponseDto> getStoreOrderDetails(
-            @Parameter(description = "Store ID", required = true, example = "1037")
+            @Parameter(description = "매장 ID", required = true, example = "1037")
             @PathVariable Long storeId,
-            @Parameter(description = "Order ID", required = true, example = "order_4aa75a911e78481c8195290208db1fc0")
+            @Parameter(description = "주문 ID", required = true, example = "order_4aa75a911e78481c8195290208db1fc0")
             @PathVariable String orderId) {
 
         // 현재 인증된 사용자의 ID를 헤더에서 가져옵니다.
-        // (Retrieves the currently authenticated user's ID from the header.)
         Long authenticatedUserId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
 
         // 요청을 보낸 사용자가 상점의 소유자인지 확인합니다.
-        // (Validates if the requesting user is the owner of the store.)
         storeSecurityService.validateStoreOwner(authenticatedUserId, storeId);
 
         // 주문 ID를 사용하여 주문을 조회합니다.
-        // (Fetches the order using the order ID.)
         OrderDetailResponse orderDetail = orderService.getOrder(orderId);
 
         // 조회된 주문이 해당 상점에 속하는지 확인합니다.
-        // (Verifies that the fetched order belongs to the specified store.)
         if (!orderDetail.getStoreId().equals(storeId)) {
             // 주문이 해당 상점에 속하지 않으면 404 에러를 발생시킵니다.
-            // (If the order does not belong to the store, treat it as not found.)
             throw new IllegalArgumentException("Order not found for this store");
         }
 
         // OpenFeign 클라이언트를 사용하여 사용자 정보를 조회합니다.
-        // (Fetch the user information using the OpenFeign client.)
         ApiResponseDto<SiteUserInfoDto> userResponse = userServiceClient.getUserInfoById(orderDetail.getUserId());
 
         // User 서비스로부터 받은 SiteUserInfoDto를 직접 사용하여 DTO를 변환합니다.
-        // (Directly use the SiteUserInfoDto received from the User service to convert the DTO.)
         OrderDetailResponseDto responseDto = convertToOrderDetailResponseDto(orderDetail, userResponse.getData());
 
         return ApiResponseDto.<OrderDetailResponseDto>builder()
@@ -247,18 +240,15 @@ public class OrderController {
 
     /**
      * OrderDetailResponse를 OrderDetailResponseDto로 변환하는 헬퍼 메서드
-     * (Helper method to convert OrderDetailResponse to OrderDetailResponseDto)
      */
     private OrderDetailResponseDto convertToOrderDetailResponseDto(OrderDetailResponse orderDetail, SiteUserInfoDto customerInfo) {
         // 상점 정보를 변환합니다.
-        // (Converts store information.)
         OrderDetailResponseDto.StoreInfo storeInfo = OrderDetailResponseDto.StoreInfo.builder()
                 .storeId(orderDetail.getStore().getStoreId())
                 .storeName(orderDetail.getStore().getStoreName())
                 .build();
 
         // 주문 상품 목록을 변환합니다.
-        // (Converts order items list.)
         List<OrderDetailResponseDto.OrderItemInfo> items = orderDetail.getItems().stream()
                 .map(item -> OrderDetailResponseDto.OrderItemInfo.builder()
                         .productName(item.getProductName())
@@ -268,7 +258,6 @@ public class OrderController {
                 .toList();
 
         // 결제 정보를 변환합니다.
-        // (Converts payment information.)
         OrderDetailResponseDto.PaymentInfo paymentInfo = null;
         if (orderDetail.getPayment() != null) {
             paymentInfo = OrderDetailResponseDto.PaymentInfo.builder()
@@ -279,7 +268,6 @@ public class OrderController {
         }
 
         // 상태 변경 이력을 변환합니다.
-        // (Converts the status change history.)
         List<OrderDetailResponseDto.OrderStatusTimestampInfo> statusHistoryInfo = null;
         if (orderDetail.getStatusHistory() != null) {
             statusHistoryInfo = orderDetail.getStatusHistory().stream()
@@ -291,7 +279,6 @@ public class OrderController {
         }
 
         // 최종 응답 DTO를 구성합니다.
-        // (Builds the final response DTO.)
         return OrderDetailResponseDto.builder()
                 .orderId(orderDetail.getOrderId())
                 .status(orderDetail.getStatus().name())
@@ -306,12 +293,12 @@ public class OrderController {
                 .build();
     }
 
-    @Operation(summary = "Get Nearby Bestsellers", description = "Retrieves paginated list of best-selling products from stores near the specified coordinates")
+    @Operation(summary = "주변 베스트셀러 조회", description = "지정된 좌표 근처 매장의 베스트셀러 상품 목록을 페이지네이션으로 조회합니다")
     @GetMapping("/products/bestsellers-nearby")
     public ApiResponseDto<Page<BestsellerProductResponseDto>> getNearbyBestsellers(
-            @Parameter(description = "Latitude coordinate", required = true, example = "37.5665")
+            @Parameter(description = "위도 좌표", required = true, example = "37.5665")
             @RequestParam double latitude,
-            @Parameter(description = "Longitude coordinate", required = true, example = "126.9780")
+            @Parameter(description = "경도 좌표", required = true, example = "126.9780")
             @RequestParam double longitude,
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,

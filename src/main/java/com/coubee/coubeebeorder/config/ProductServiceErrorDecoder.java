@@ -13,8 +13,8 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * Custom error decoder for handling product service errors
- * Converts Feign exceptions to appropriate domain exceptions
+ * 상품 서비스 오류 처리를 위한 커스텀 에러 디코더
+ * Feign 예외를 적절한 도메인 예외로 변환합니다
  */
 @Slf4j
 public class ProductServiceErrorDecoder implements ErrorDecoder {
@@ -29,19 +29,19 @@ public class ProductServiceErrorDecoder implements ErrorDecoder {
 
         switch (response.status()) {
             case 404:
-                return new NotFound("Product not found");
+                return new NotFound("상품을 찾을 수 없습니다");
             case 400:
-                // Check if this is an INSUFFICIENT_STOCK error
+                // INSUFFICIENT_STOCK 오류인지 확인
                 String errorCode = extractErrorCodeFromResponse(response);
                 if ("INSUFFICIENT_STOCK".equals(errorCode)) {
                     String errorMessage = extractErrorMessageFromResponse(response);
                     return new InsufficientStockException(errorMessage != null ? errorMessage : "재고가 부족합니다.");
                 }
-                return new ApiError("Invalid product request");
+                return new ApiError("잘못된 상품 요청입니다");
             case 500:
-                return new ApiError("Product service internal error");
+                return new ApiError("상품 서비스 내부 오류입니다");
             case 503:
-                return new ApiError("Product service temporarily unavailable");
+                return new ApiError("상품 서비스가 일시적으로 사용할 수 없습니다");
             default:
                 return defaultErrorDecoder.decode(methodKey, response);
         }
@@ -65,7 +65,7 @@ public class ProductServiceErrorDecoder implements ErrorDecoder {
                 }
             }
         } catch (IOException e) {
-            log.warn("Failed to parse error response body", e);
+            log.warn("에러 응답 본문 파싱에 실패했습니다", e);
         }
         return null;
     }
@@ -88,7 +88,7 @@ public class ProductServiceErrorDecoder implements ErrorDecoder {
                 }
             }
         } catch (IOException e) {
-            log.warn("Failed to parse error response body for message", e);
+            log.warn("메시지를 위한 에러 응답 본문 파싱에 실패했습니다", e);
         }
         return null;
     }
