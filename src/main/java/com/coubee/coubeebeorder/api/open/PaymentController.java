@@ -6,6 +6,9 @@ import com.coubee.coubeebeorder.domain.dto.PaymentReadyRequest;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyResponse;
 import com.coubee.coubeebeorder.service.PaymentService;
 import com.coubee.coubeebeorder.service.OrderService;
+
+import io.micrometer.core.annotation.Counted;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +25,8 @@ import java.util.Map;
 @RequestMapping("/api/order/payment")
 @RequiredArgsConstructor
 @Tag(name = "결제", description = "결제 관련 API")
+@Timed
+@Counted
 public class PaymentController {
 
     private final PaymentService paymentService;

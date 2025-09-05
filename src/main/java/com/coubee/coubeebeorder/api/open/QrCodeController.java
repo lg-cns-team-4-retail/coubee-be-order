@@ -1,6 +1,9 @@
 package com.coubee.coubeebeorder.api.open;
 
 import com.coubee.coubeebeorder.service.QrCodeService;
+
+import io.micrometer.core.annotation.Counted;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/order/qr")
 @RequiredArgsConstructor
 @Tag(name = "QR 코드", description = "QR 코드 생성 API")
+@Timed
+@Counted
 public class QrCodeController {
 
     private final QrCodeService qrCodeService;

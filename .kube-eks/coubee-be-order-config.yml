@@ -47,3 +47,23 @@ data:
       api:
         url: https://api.portone.io
         version: v2
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: prometheus, health, info
+      metrics:
+        distribution:
+          percentiles-histogram:
+            http.server.requests: true
+            hikaricp.connections.acquire: true
+            hikaricp.connections.usage: true
+          percentiles:
+            http.server.requests: 0.95
+            hikaricp.connections.acquire: 0.95
+            hikaricp.connections.usage: 0.95
+      prometheus:
+        metrics:
+          export:
+            enabled: true

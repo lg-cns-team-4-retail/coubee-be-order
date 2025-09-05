@@ -40,6 +40,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/order")
 @RequiredArgsConstructor
+@Timed
+@Counted
 public class OrderController {
 
     private final OrderService orderService;

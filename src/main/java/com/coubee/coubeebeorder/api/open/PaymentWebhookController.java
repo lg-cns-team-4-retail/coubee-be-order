@@ -2,6 +2,9 @@ package com.coubee.coubeebeorder.api.open;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.service.PaymentService;
+
+import io.micrometer.core.annotation.Counted;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/order/webhook")
 @RequiredArgsConstructor
 @Tag(name = "결제 웹훅", description = "결제 웹훅 API")
+@Timed
+@Counted
 public class PaymentWebhookController {
 
     private final PaymentService paymentService;
