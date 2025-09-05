@@ -21,6 +21,7 @@ public class OrderNotificationEvent {
     private String eventId;
     private String notificationType; // PAID, CANCELLED_USER, CANCELLED_ADMIN, PREPARING, PREPARED
     private String orderId;
+    private Long storeId;
     private Long userId;
     private String title;
     private String message;
@@ -35,6 +36,7 @@ public class OrderNotificationEvent {
                 .notificationType("PAID")
                 .orderId(orderId)
                 .userId(userId)
+                .storeId(0L)
                 .title("결제 완료")
                 .message(storeName + " 매장에서 결제가 완료되었습니다.")
                 .timestamp(LocalDateTime.now())
@@ -50,6 +52,7 @@ public class OrderNotificationEvent {
                 .notificationType("CANCELLED_USER")
                 .orderId(orderId)
                 .userId(userId)
+                .storeId(0L)
                 .title("주문 취소")
                 .message(storeName + " 매장 주문이 취소되었습니다.")
                 .timestamp(LocalDateTime.now())
@@ -65,6 +68,7 @@ public class OrderNotificationEvent {
                 .notificationType("CANCELLED_ADMIN")
                 .orderId(orderId)
                 .userId(userId)
+                .storeId(0L)
                 .title("주문 취소")
                 .message(storeName + " 매장 주문이 관리자에 의해 취소되었습니다.")
                 .timestamp(LocalDateTime.now())
@@ -80,6 +84,7 @@ public class OrderNotificationEvent {
                 .notificationType("PREPARING")
                 .orderId(orderId)
                 .userId(userId)
+                .storeId(0L)
                 .title("주문 수락")
                 .message(storeName + " 매장에서 주문을 수락했습니다.")
                 .timestamp(LocalDateTime.now())
@@ -95,6 +100,7 @@ public class OrderNotificationEvent {
                 .notificationType("PREPARED")
                 .orderId(orderId)
                 .userId(userId)
+                .storeId(0L)
                 .title("픽업 준비 완료")
                 .message(storeName + " 매장에서 픽업준비가 완료되었습니다.")
                 .timestamp(LocalDateTime.now())
@@ -108,13 +114,14 @@ public class OrderNotificationEvent {
      * @param storeName 매장 이름 (translation: Store name)
      * @return 점주용 OrderNotificationEvent 객체 (translation: OrderNotificationEvent object for the store owner)
      */
-    public static OrderNotificationEvent createNewOrderNotificationForOwner(String orderId, Long ownerId, String storeName) {
+    public static OrderNotificationEvent createNewOrderNotificationForOwner(String orderId, Long ownerId, String storeName, Long storeId) {
         return OrderNotificationEvent.builder()
                 .eventId(UUID.randomUUID().toString())
                 .notificationType("PAID") // 점주를 위한 새로운 알림 타입 (translation: A new notification type for the store owner)
                 .orderId(orderId)
                 .userId(ownerId) // ★★★ 알림 수신 대상을 점주 ID로 설정 (translation: ★★★ Set the notification recipient to the owner's ID)
                 .title("신규 주문 접수") // (translation: New Order Received)
+                .storeId(storeId)
                 .message("[" + storeName + "] 매장에 새로운 주문이 접수되었습니다. 주문을 확인해주세요.") // (translation: A new order has been received at the [" + storeName + "] store. Please check the order.)
                 .timestamp(LocalDateTime.now())
                 .build();
