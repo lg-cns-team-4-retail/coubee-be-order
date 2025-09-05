@@ -39,11 +39,11 @@ public class StatisticServiceImpl implements StatisticService {
      */
     private void validateStoreAccess(Long userId, Long storeId) {
         if (storeId == null) {
-            return; // System-wide statistics don't require store validation
+            return; // 시스템 전체 통계는 매장 검증이 필요하지 않음
         }
 
         try {
-            // Get user's owned approved stores from store service
+            // 스토어 서비스에서 사용자가 소유한 승인된 매장 목록 조회
             ApiResponseDto<List<Long>> ownedStoresResponse = storeClient.getStoresByOwnerIdOnApproved(userId);
             List<Long> ownedStoreIds = ownedStoresResponse.getData();
 
@@ -51,8 +51,8 @@ public class StatisticServiceImpl implements StatisticService {
                 throw new IllegalArgumentException("You can only view statistics for registered stores you own.");
             }
 
-            // Store status validation temporarily disabled for production compatibility
-            // The isStoreApproved API is not yet available in the production main branch
+            // 프로덕션 호환성을 위해 매장 상태 검증 임시 비활성화
+            // isStoreApproved API가 아직 프로덕션 메인 브랜치에서 사용할 수 없음
             /*
             ApiResponseDto<Boolean> storeStatusResponse = storeClient.isStoreApproved(storeId);
             Boolean isApproved = storeStatusResponse.getData();
@@ -85,25 +85,25 @@ public class StatisticServiceImpl implements StatisticService {
      * @return percentage change as a double
      */
     private double calculatePercentageChange(Long currentValue, Long previousValue) {
-        // Handle null values by treating them as 0
+        // null 값을 0으로 처리
         long current = currentValue != null ? currentValue : 0L;
         long previous = previousValue != null ? previousValue : 0L;
 
-        // Handle edge cases
+        // 예외 상황 처리
         if (previous == 0) {
-            // If previous period's sales are zero
+            // 이전 기간 매출이 0인 경우
             if (current > 0) {
-                return 100.0; // 100% increase
+                return 100.0; // 100% 증가
             } else {
-                return 0.0; // No change (both are zero)
+                return 0.0; // 변화 없음 (둘 다 0)
             }
         }
 
         if (current == 0 && previous > 0) {
-            return -100.0; // 100% decrease
+            return -100.0; // 100% 감소
         }
 
-        // Calculate percentage change: ((current - previous) / previous) * 100
+        // 백분율 변화 계산: ((현재 - 이전) / 이전) * 100
         return ((double) (current - previous) / previous) * 100.0;
     }
 
@@ -115,12 +115,12 @@ public class StatisticServiceImpl implements StatisticService {
         return new PeakHourProjection() {
             @Override
             public Integer getHour() {
-                return null; // No peak hour data available
+                return null; // 피크 시간 데이터 없음
             }
 
             @Override
             public Long getHourlySales() {
-                return 0L; // No sales data available
+                return 0L; // 매출 데이터 없음
             }
         };
     }
@@ -133,12 +133,12 @@ public class StatisticServiceImpl implements StatisticService {
         return new BestDayProjection() {
             @Override
             public String getDayName() {
-                return "No data"; // No best day data available
+                return "데이터 없음"; // 최고 매출일 데이터 없음
             }
 
             @Override
             public Long getDailySales() {
-                return 0L; // No sales data available
+                return 0L; // 매출 데이터 없음
             }
         };
     }
@@ -152,11 +152,11 @@ public class StatisticServiceImpl implements StatisticService {
         validateStoreAccess(userId, storeId);
 
         try {
-            // Convert LocalDate to UNIX timestamps
+            // LocalDate를 UNIX 타임스탬프로 변환
             long startUnix = startDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
             long endUnix = endDate.atTime(LocalTime.MAX).toEpochSecond(ZoneOffset.UTC);
 
-            // 핫딜 데이터가 포함된 새로운 쿼리 메소드를 호출합니다. (translation: Call the new query method that includes Hotdeal data.)
+            // 핫딜 데이터가 포함된 새로운 쿼리 메소드를 호출합니다.
             List<OrderRepository.SoldItemsSummaryProjection> projections =
                 orderRepository.getSoldItemsSummaryWithHotdeal(startUnix, endUnix, storeId);
 

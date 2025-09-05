@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 public class ProductStockServiceImpl implements ProductStockService {
 
     private final ProductClient productClient;
-    private final KafkaMessageProducer kafkaMessageProducer; // ★ KafkaMessageProducer must be injected
+    private final KafkaMessageProducer kafkaMessageProducer; // ★ 카프카메시지프로듀서가 주입되어야 합니다
 
     @Override
     @Transactional
@@ -52,17 +52,17 @@ public class ProductStockServiceImpl implements ProductStockService {
                     .items(stockItems)
                     .build();
 
-            // Product Service에 재고 감소 요청
+            // 상품 서비스에 재고 감소 요청
             ApiResponseDto<String> response = productClient.updateStock(request, order.getUserId());
 
-            // Check for success based on response code (product-service doesn't set success field)
+            // 응답 코드를 기반으로 성공 여부 확인 (상품서비스는 성공 필드를 설정하지 않음)
             if (!"OK".equals(response.getCode())) {
                 log.error("재고 감소 실패 - 주문 ID: {}, 응답 코드: {}, 메시지: {}",
                         order.getOrderId(), response.getCode(), response.getMessage());
                 throw new RuntimeException("재고 감소에 실패했습니다: " + response.getMessage());
             }
 
-            // If we reach here, it means the operation was successful
+            // 여기에 도달하면 작업이 성공했음을 의미
             log.info("재고 감소 성공 - 주문 ID: {}, 응답: {}", order.getOrderId(), response.getData());
 
         } catch (Exception e) {
@@ -75,14 +75,11 @@ public class ProductStockServiceImpl implements ProductStockService {
     @Transactional
     public void increaseStock(Order order) {
         log.info("재고 증가 이벤트 발행 요청 - 주문 ID: {}, 매장 ID: {}", order.getOrderId(), order.getStoreId());
-        // (translation: Request to publish stock increase event - Order ID: ..., Store ID: ...)
 
         try {
-            // [수정] OpenFeign 호출 대신 Kafka 메시지를 발행합니다.
-            // (translation: [MODIFIED] Publish a Kafka message instead of making an OpenFeign call.)
+            // [수정] OpenFeign 호출 대신 카프카 메시지를 발행합니다.
             
-            // 1. StockIncreaseEvent에 필요한 StockItem 리스트 생성
-            // (translation: 1. Create the list of StockItems required for the StockIncreaseEvent)
+            // 1. 재고증가이벤트에 필요한 재고아이템 목록 생성
             List<StockIncreaseEvent.StockItem> stockItems = order.getItems().stream()
                     .map(item -> StockIncreaseEvent.StockItem.builder()
                             .productId(item.getProductId())
@@ -90,22 +87,20 @@ public class ProductStockServiceImpl implements ProductStockService {
                             .build())
                     .collect(Collectors.toList());
 
-            // 2. StockIncreaseEvent 생성 (translation: 2. Create the StockIncreaseEvent)
+            // 2. 재고증가이벤트 생성
             StockIncreaseEvent event = StockIncreaseEvent.create(
                 order.getOrderId(),
                 order.getUserId(),
                 stockItems
             );
 
-            // 3. Kafka 메시지 발행 (translation: 3. Publish the Kafka message)
+            // 3. 카프카 메시지 발행
             kafkaMessageProducer.publishStockIncreaseEvent(event);
 
             log.info("재고 증가(보상) 이벤트 발행 성공 - 주문 ID: {}", order.getOrderId());
-            // (translation: Successfully published stock increase (compensation) event - Order ID: ...)
 
         } catch (Exception e) {
             log.error("재고 증가 이벤트 발행 중 오류 발생 - 주문 ID: {}. 메시지 처리는 계속되지만 수동 확인이 필요할 수 있습니다.", order.getOrderId(), e);
-            // (translation: Error while publishing stock increase event - Order ID: .... Processing will continue, but manual verification may be required.)
         }
     }
 
@@ -120,16 +115,16 @@ public class ProductStockServiceImpl implements ProductStockService {
                 order.getOrderId(), ex);
 
         try {
-            // --- This is the compensating transaction ---
+            // --- 이것은 보상 트랜잭션입니다 ---
             increaseStock(order);
             log.info("Successfully restored stock (compensating transaction) for Order ID: {}", order.getOrderId());
         } catch (Exception compensationException) {
-            // If the compensation also fails, log a critical error for manual intervention
+            // 보상 트랜잭션도 실패하면 수동 개입을 위한 중요 오류 로그 기록
             log.error("CRITICAL: Compensating transaction FAILED for Order ID: {}. Manual stock correction is required.",
                     order.getOrderId(), compensationException);
         }
 
-        // Finally, throw a user-friendly exception to the client
+        // 마지막으로 클라이언트에 사용자 친화적인 예외 발생
         throw new ApiError("상품 서비스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.");
     }
 

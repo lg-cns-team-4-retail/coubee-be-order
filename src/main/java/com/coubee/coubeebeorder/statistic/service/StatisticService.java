@@ -27,7 +27,7 @@ public interface StatisticService {
     List<ProductSalesSummaryDto> getProductSalesSummary(Long storeId, LocalDate startDate, LocalDate endDate, Long userId);
 
     // ========================================
-    // Enhanced Statistics Methods with Hotdeal Support
+    // 핫딜 지원이 포함된 향상된 통계 메소드
     // ========================================
 
     /**

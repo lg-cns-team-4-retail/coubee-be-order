@@ -1,6 +1,6 @@
 package com.coubee.coubeebeorder.service;
 
-// PortOnePaymentResponse 대신 SDK의 DTO를 import 합니다
+// PortOnePaymentResponse 대신 SDK의 DTO를 가져옵니다
 // import io.portone.sdk.server.payment.PaymentGetResponse;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyRequest;
 import com.coubee.coubeebeorder.domain.dto.PaymentReadyResponse;

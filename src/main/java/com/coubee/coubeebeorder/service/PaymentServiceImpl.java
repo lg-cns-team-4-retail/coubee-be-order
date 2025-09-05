@@ -161,7 +161,7 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             // 임시 해결책: S2S 검증 건너뛰고 웹훅 이벤트만 믿고 처리
-            // TODO: 테스트 모드 API 키 적용 후 S2S 검증 로직 복원 필요
+            // TODO: 테스트 모드 API 키 적용 후 서버 간 검증 로직 복원 필요
             log.info("임시 해결책: S2S 검증 건너뛰고 웹훅 이벤트 기반으로 결제 상태 업데이트");
 
             // 웹훅 이벤트 타입에 따라 처리
@@ -169,16 +169,16 @@ public class PaymentServiceImpl implements PaymentService {
             if ("Transaction.Paid".equals(eventType)) {
                 log.info("Processing 'Transaction.Paid' event for order (merchant_uid): {}, PortOne tx_id: {}", merchantUid, transactionId);
                 
-                // 1. Perform all DB updates first within this primary transaction.
+                // 1. 이 주 트랜잭션 내에서 먼저 모든 DB 업데이트를 수행합니다.
                 Order order = orderRepository.findByOrderId(merchantUid)
-                        .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다: " + merchantUid)); // (translation: Order not found:)
+                        .orElseThrow(() -> new NotFound("주문을 찾을 수 없습니다: " + merchantUid));
                 
                 Payment payment = paymentRepository.findByOrder_OrderId(merchantUid).orElseGet(() -> {
-                    log.info("결제 정보가 없어 새로 생성합니다: {}", merchantUid); // (translation: Creating new payment info as none exists:)
+                    log.info("결제 정보가 없어 새로 생성합니다: {}", merchantUid);
                     Payment newPayment = Payment.createPayment(
                             merchantUid,
                             order,
-                            "UNKNOWN", // 웹훅에서는 상세 정보 제한적 (translation: Limited detail info from webhook)
+                            "UNKNOWN", // 웹훅에서는 상세 정보 제한적
                             order.getTotalAmount()
                     );
                     return paymentRepository.save(newPayment);
@@ -193,7 +193,7 @@ public class PaymentServiceImpl implements PaymentService {
                 
                 log.info("Order and payment status successfully updated to PAID for order: {}", merchantUid);
                 
-                // 2. After DB logic is complete, publish an event to notify the owner.
+                // 2. DB 로직이 완료된 후, 소유자에게 알림을 위한 이벤트를 발행합니다.
                 eventPublisher.publishEvent(new OrderPaidEvent(order.getOrderId(), order.getStoreId(), order.getUserId()));
                 
                 return true;
@@ -213,12 +213,12 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Transactional
     public boolean processPaidPayment(PaidPayment paidPayment) {
-        // PortOne V2에서 id는 paymentId (merchant_uid)에 해당
+        // PortOne V2에서 id는 결제ID (merchant_uid)에 해당
         String merchantUid = paidPayment.getId();
         String transactionId = paidPayment.getTransactionId();
         long paidAmount = paidPayment.getAmount().getTotal();
         
-        // PaymentMethod에서 provider 정보 추출 (타입별 처리)
+        // 결제방법에서 제공업체 정보 추출 (타입별 처리)
         String pgProvider = extractPgProvider(paidPayment.getMethod());
         
         String pgTransactionId = paidPayment.getPgTxId() != null ? paidPayment.getPgTxId() : "";
@@ -253,10 +253,10 @@ public class PaymentServiceImpl implements PaymentService {
         );
         orderService.updateOrderStatusWithHistory(merchantUid, OrderStatus.PAID);
 
-        // V3: 결제 완료 시점을 UNIX 타임스탬프로 설정
+        // V3: 결제 완료 시점을 유닉스 타임스탬프로 설정
         order.markAsPaidNow();
 
-        // V3: 모든 주문 아이템의 이벤트 타입을 PURCHASE로 설정
+        // V3: 모든 주문 아이템의 이벤트 타입을 구매로 설정
         order.getItems().forEach(item -> item.updateEventType(EventType.PURCHASE));
 
         // 재고 감소는 이미 결제 준비 시점에 처리되었으므로 여기서는 제거
@@ -283,8 +283,7 @@ public class PaymentServiceImpl implements PaymentService {
     public String createAndCompleteTestOrder(com.coubee.coubeebeorder.domain.dto.TestOrderCreateRequest request) {
         log.info("Creating and force-completing test order for request: {}", request);
 
-        // 1. Product Service에서 실제 상품 정보 조회 (가격을 가져오기 위함)
-        // (Fetch actual product information from Product Service (to get the price))
+        // 1. 상품 서비스에서 실제 상품 정보 조회 (가격을 가져오기 위함)
         com.coubee.coubeebeorder.common.dto.ApiResponseDto<com.coubee.coubeebeorder.remote.product.ProductResponseDto> productResponse = productClient.getProductById(request.getProductId(), request.getUserId());
         if (productResponse == null || productResponse.getData() == null) {
             throw new com.coubee.coubeebeorder.common.exception.NotFound("Test failed: Product not found with ID: " + request.getProductId());
@@ -292,30 +291,24 @@ public class PaymentServiceImpl implements PaymentService {
         com.coubee.coubeebeorder.remote.product.ProductResponseDto product = productResponse.getData();
 
         // 2. 리팩토링된 금액 계산 로직을 적용하여 원가, 할인가, 최종 결제액을 계산합니다.
-        // (Applies the refactored amount calculation logic to determine original amount, discount, and final payment amount.)
         int totalOriginAmount = product.getOriginPrice() * request.getQuantity();
         int totalSaleAmount = product.getSalePrice() * request.getQuantity();
         int productDiscountAmount = totalOriginAmount - totalSaleAmount;
         
         // 테스트 주문에서는 핫딜 할인이 없다고 가정합니다.
-        // (For test orders, assume there is no hotdeal discount.)
         int hotdealDiscountAmount = 0;
         
         // 총 할인액은 상품 할인액과 핫딜 할인액의 합계입니다.
-        // (Total discount amount is the sum of product discount and hotdeal discount.)
         int totalDiscountAmount = productDiscountAmount + hotdealDiscountAmount;
         
         // 최종 결제 금액은 판매가에서 핫딜 할인액을 뺀 값입니다.
-        // (Final payment amount is the sale amount minus hotdeal discount.)
         int finalPaymentAmount = totalSaleAmount - hotdealDiscountAmount;
 
         // 3. 조회한 상품 정보로 주문 데이터 생성
-        // (Create order data with the fetched product information)
         String orderId = "test_order_" + java.util.UUID.randomUUID().toString().replace("-", "");
         String recipientName = "Test User";
         
-        // store-service에서 storeName을 가져옵니다.
-        // (translation: Fetch storeName from the store-service.)
+        // 매장 서비스에서 매장명을 가져옵니다.
         com.coubee.coubeebeorder.common.dto.ApiResponseDto<com.coubee.coubeebeorder.remote.store.StoreResponseDto> storeResponse = storeClient.getStoreById(request.getStoreId(), request.getUserId());
         if (storeResponse == null || storeResponse.getData() == null) {
             throw new com.coubee.coubeebeorder.common.exception.NotFound("Test failed: Store not found with ID: " + request.getStoreId());
@@ -327,12 +320,10 @@ public class PaymentServiceImpl implements PaymentService {
         order.addOrderItem(item);
 
         // 4. 결제 데이터 생성
-        // (Create payment data)
         Payment payment = Payment.createPayment(orderId, order, "CARD", finalPaymentAmount);
         order.setPayment(payment);
 
         // 5. 주문 및 결제 상태를 강제로 'PAID'로 변경
-        // (Forcefully update order and payment status to 'PAID')
         order.updateStatus(OrderStatus.PAID);
         order.markAsPaidNow();
         order.getItems().forEach(orderItem -> orderItem.updateEventType(EventType.PURCHASE));
@@ -340,20 +331,16 @@ public class PaymentServiceImpl implements PaymentService {
         payment.updateStatus(PaymentStatus.PAID);
         payment.updatePaidStatus("test-pg", "test-pg-tid-" + orderId, "http://test.receipt.url");
 
-        // 6. [FIX] 데이터베이스에 먼저 저장합니다.
-        // ([FIX] First, save to the database.)
-        // Cascade 설정으로 인해 Order, OrderItem, Payment가 모두 저장됩니다.
-        // (Due to Cascade settings, Order, OrderItem, and Payment will all be saved.)
+        // 6. [수정] 데이터베이스에 먼저 저장합니다.
+        // 연쇄 설정으로 인해 주문, 주문아이템, 결제가 모두 저장됩니다.
         orderRepository.save(order);
         log.info("Test order saved to database with orderId: {}", orderId);
 
-        // 7. [FIX] 저장된 후에 상태 변경 이력을 기록합니다.
-        // ([FIX] Record the status change history after saving.)
-        // 이렇게 함으로써 updateOrderStatusWithHistory가 DB에서 주문을 조회할 시점에는 이미 주문 데이터가 존재하게 되어 NotFound 예외가 발생하지 않습니다.
-        // (This ensures the order data already exists when updateOrderStatusWithHistory queries the DB, preventing a NotFound exception.)
+        // 7. [수정] 저장된 후에 상태 변경 이력을 기록합니다.
+        // 이렇게 함으로써 주문상태이력업데이트가 DB에서 주문을 조회할 시점에는 이미 주문 데이터가 존재하게 되어 찾을수없음 예외가 발생하지 않습니다.
         orderService.updateOrderStatusWithHistory(order.getOrderId(), OrderStatus.PAID);
 
-        // 8. After DB logic, publish an event. The listener will handle the notification.
+        // 8. DB 로직 후, 이벤트를 발행합니다. 리스너가 알림을 처리합니다.
         eventPublisher.publishEvent(new OrderPaidEvent(order.getOrderId(), order.getStoreId(), order.getUserId()));
 
         return orderId;
@@ -395,11 +382,11 @@ public class PaymentServiceImpl implements PaymentService {
             return "UNKNOWN";
         }
         
-        // PaymentMethod는 union type이므로 런타임 클래스명으로 판단
+        // 결제방법은 유니온 타입이므로 런타임 클래스명으로 판단
         String className = paymentMethod.getClass().getSimpleName();
         log.debug("PaymentMethod 클래스: {}", className);
         
-        // 클래스명 기반으로 PG 제공자 추출
+        // 클래스명 기반으로 결제게이트웨이 제공자 추출
         if (className.contains("Card")) {
             return "CARD";
         } else if (className.contains("VirtualAccount")) {

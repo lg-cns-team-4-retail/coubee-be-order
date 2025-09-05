@@ -31,9 +31,9 @@ public class PortOneWebhookVerifier {
             log.info("[WEBHOOK_DEBUG] Signature: {}", signature);
             log.info("[WEBHOOK_DEBUG] Timestamp: {}", timestamp);
             
-            // PortOne V2 JVM SDK의 verify 메소드 사용
-            // WebhookVerifier는 생성자에서 이미 시크릿을 받았으므로 여기서는 전달하지 않음
-            // verify(msgBody, msgId, msgSignature, msgTimestamp) 순서
+            // PortOne V2 JVM SDK의 검증 메소드 사용
+            // 웹훅검증기는 생성자에서 이미 시크릿을 받았으므로 여기서는 전달하지 않음
+            // 검증(메시지본문, 메시지ID, 메시지서명, 메시지타임스탬프) 순서
             webhookVerifier.verify(
                 requestBody,    // msgBody
                 webhookId != null ? webhookId : "",  // msgId (webhook-id)

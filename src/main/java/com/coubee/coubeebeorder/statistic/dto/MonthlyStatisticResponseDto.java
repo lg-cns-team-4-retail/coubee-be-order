@@ -29,11 +29,11 @@ public class MonthlyStatisticResponseDto {
     @Schema(description = "Hotdeal vs Regular sales breakdown")
     private HotdealAnalysis hotdealAnalysis;
 
-    // Weekly Breakdown for Charts
+    // 차트용 주별 분석
     @Schema(description = "Weekly breakdown of sales for chart display")
     private List<WeeklyBreakdown> weeklyBreakdown;
 
-    // Complete Sold Items List
+    // 전체 판매 상품 목록
     @Schema(description = "Complete list of sold items with details")
     private List<SoldItemSummary> soldItemsSummary;
 

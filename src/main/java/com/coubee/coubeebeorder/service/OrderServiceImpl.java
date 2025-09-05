@@ -19,7 +19,7 @@ import com.coubee.coubeebeorder.remote.user.SiteUserInfoDto;
 import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
 import java.util.Objects;
 import com.coubee.coubeebeorder.remote.hotdeal.HotdealResponseDto;
-// import io.portone.sdk.server.payment.CancelPaymentRequest; // Not available in current SDK version
+// import io.portone.sdk.server.payment.CancelPaymentRequest; // 현재 SDK 버전에서 사용 불가
 import io.portone.sdk.server.payment.PaymentClient;
 import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -226,8 +226,8 @@ public class OrderServiceImpl implements OrderService {
         if (order.getPayment() != null && order.getPayment().getStatus() == PaymentStatus.PAID) {
             try {
                 // 공식 SDK를 사용하여 결제를 취소합니다
-                // TODO: CancelPaymentRequest가 사용 가능할 때 적절한 취소 구현
-                // transactionId는 Payment 테이블에 저장된 pg_transaction_id를 사용해야 합니다
+                // TODO: 결제취소요청이 사용 가능할 때 적절한 취소 구현
+                // 거래ID는 결제 테이블에 저장된 PG거래ID를 사용해야 합니다
                 String transactionId = order.getPayment().getPgTransactionId();
 
                 if (transactionId == null || transactionId.isBlank()) {
@@ -302,18 +302,18 @@ public class OrderServiceImpl implements OrderService {
             return Page.empty(pageable);
         }
 
-        // Step 2: Extract order IDs from the Object[] results (first column is order_id)
+        // 2단계: Object[] 결과에서 주문 ID 추출 (첫 번째 컬럼이 order_id)
         List<String> orderIds = orderDataPage.getContent().stream()
                 .map(row -> (String) row[0])
                 .collect(Collectors.toList());
 
-        // Step 3: Fetch the full details for the order IDs using fetch joins
+        // 3단계: 페치 조인을 사용하여 주문 ID들의 전체 상세정보 조회
         List<Order> ordersWithDetails = orderRepository.findWithDetailsIn(orderIds);
 
-        // Step 4: Convert the detailed entities to DTOs
+        // 4단계: 상세 엔티티를 DTO로 변환
         List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(ordersWithDetails);
 
-        // Step 5: Create and return the final Page object with the DTOs and original pagination info
+        // 5단계: DTO와 원본 페이지네이션 정보로 최종 Page 객체 생성 및 반환
         return new PageImpl<>(orderDetailResponses, pageable, orderDataPage.getTotalElements());
     }
 
@@ -400,7 +400,7 @@ public class OrderServiceImpl implements OrderService {
     private void updateOrderStatusAndCreateHistory(Order order, OrderStatus newStatus) {
         order.updateStatus(newStatus);
 
-        // Create and add status history record
+        // 상태 이력 레코드 생성 및 추가
         OrderTimestamp timestamp = OrderTimestamp.createTimestamp(order, newStatus);
         order.addStatusHistory(timestamp);
 
@@ -447,26 +447,22 @@ public class OrderServiceImpl implements OrderService {
 
     private void publishCancelNotificationEvent(Order order, OrderStatus cancelStatus) {
         try {
-            // [수정] StoreClient를 통해 매장 정보를 조회합니다. (translation: [MODIFIED] Fetch store information via StoreClient.)
+            // [수정] StoreClient를 통해 매장 정보를 조회합니다.
             ApiResponseDto<StoreResponseDto> storeResponse = storeClient.getStoreById(order.getStoreId(), order.getUserId());
             String storeName = storeResponse.getData() != null ? storeResponse.getData().getStoreName() : "매장";
 
             if (cancelStatus == OrderStatus.CANCELLED_USER) {
-                // 고객이 취소한 경우 (translation: When the customer cancels)
-
-                // Send cancellation notification to customer only
-
-                // 2. 고객에게 보낼 '취소 완료' 알림 (translation: 2. "Cancellation Confirmed" notification for the customer)
+                // 고객이 취소한 경우
+                // 2. 고객에게 보낼 '취소 완료' 알림
                 OrderNotificationEvent forCustomer = OrderNotificationEvent.createCancelledUserNotification(
                         order.getOrderId(),
-                        order.getUserId(), // ★ 알림 수신 대상을 고객 ID로 설정 (translation: ★ Set recipient to customer's userId)
+                        order.getUserId(), // ★ 알림 수신 대상을 고객 ID로 설정
                         storeName
                 );
                 kafkaMessageProducer.publishOrderNotificationEvent(forCustomer);
 
             } else if (cancelStatus == OrderStatus.CANCELLED_ADMIN) {
-                // 점주가 취소한 경우 (기존 로직 유지, 고객에게만 발송) 
-                // (translation: When the admin cancels (maintain existing logic, send only to customer))
+                // 점주가 취소한 경우 (기존 로직 유지, 고객에게만 발송)
                 OrderNotificationEvent forCustomer = OrderNotificationEvent.createCancelledAdminNotification(
                         order.getOrderId(),
                         order.getUserId(),
@@ -675,16 +671,16 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private OrderDetailResponse convertToOrderDetailResponse(Order order) {
-        // Fetch store details with circuit breaker
+        // 서킷 브레이커로 매장 상세정보 조회
         StoreResponseDto storeDetails = getStoreDetailsWithCircuitBreaker(order.getStoreId(), order.getUserId());
 
-        // Fetch product details for each item with circuit breaker
+        // 서킷 브레이커로 각 아이템의 상품 상세정보 조회
         List<OrderDetailResponse.OrderItemResponse> itemResponses = order.getItems().stream()
                 .map(item -> {
                     ProductResponseDto productDetails = getProductDetailsWithCircuitBreaker(item.getProductId(), order.getUserId());
 
                     return OrderDetailResponse.OrderItemResponse.builder()
-                            .product(productDetails) // Full product details
+                            .product(productDetails) // 전체 상품 상세정보
                             .productId(item.getProductId())
                             .productName(item.getProductName())
                             .quantity(item.getQuantity())
@@ -708,7 +704,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderId(order.getOrderId())
                 .userId(order.getUserId())
                 .storeId(order.getStoreId())
-                .store(storeDetails) // Full store details
+                .store(storeDetails) // 전체 매장 상세정보
                 .status(order.getStatus())
                 .originalAmount(order.getOriginalAmount())
                 .discountAmount(order.getDiscountAmount())
@@ -887,7 +883,7 @@ public class OrderServiceImpl implements OrderService {
     public UserOrderSummaryDto getUserOrderSummary(Long userId) {
         log.info("Getting user order summary for userId: {}", userId);
 
-        // Simple implementation returning zero values for now
+        // 현재는 0값을 반환하는 간단한 구현
         return UserOrderSummaryDto.builder()
                 .totalOrderCount(0L)
                 .totalOriginalAmount(0L)
@@ -901,7 +897,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Getting store order summary for ownerUserId: {}, storeId: {}, startDate: {}, endDate: {}", 
                  ownerUserId, storeId, startDate, endDate);
 
-        // Security Check: Verify store ownership
+        // 보안 검사: 매장 소유권 확인
         try {
             ApiResponseDto<List<Long>> storeResponse = storeClient.getStoresByOwnerIdOnApproved(ownerUserId);
             if (storeResponse == null || storeResponse.getData() == null || !storeResponse.getData().contains(storeId)) {
@@ -1004,7 +1000,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Getting nearby bestsellers for coordinates: lat={}, lng={}, pageable={}", latitude, longitude, pageable);
 
         try {
-            // 1단계: 주변 상점 ID 목록 조회 (translation: Step 1: Get nearby store IDs)
+            // 1단계: 주변 상점 ID 목록 조회
             ApiResponseDto<List<Long>> nearbyStoresResponse = storeClient.getNearStoreIds(latitude, longitude);
             if (nearbyStoresResponse == null || nearbyStoresResponse.getData() == null || nearbyStoresResponse.getData().isEmpty()) {
                 log.info("No nearby stores found for coordinates: lat={}, lng={}", latitude, longitude);
@@ -1013,7 +1009,7 @@ public class OrderServiceImpl implements OrderService {
             List<Long> nearbyStoreIds = nearbyStoresResponse.getData();
             log.debug("Found {} nearby stores: {}", nearbyStoreIds.size(), nearbyStoreIds);
 
-            // 2단계: 판매량 순으로 정렬된 상품 ID와 판매량 조회 (translation: Step 2: Get product IDs and sales counts, sorted by sales volume)
+            // 2단계: 판매량 순으로 정렬된 상품 ID와 판매량 조회
             Page<OrderRepository.BestsellerProductProjection> bestsellerPage =
                 orderRepository.findBestsellersByStoreIds(nearbyStoreIds, pageable);
             if (bestsellerPage.isEmpty()) {
@@ -1021,13 +1017,13 @@ public class OrderServiceImpl implements OrderService {
                 return Page.empty(pageable);
             }
 
-            // 3단계: 상품 상세 정보 조회를 위해 ID만 추출 (translation: Step 3: Extract only product IDs to fetch details)
+            // 3단계: 상품 상세 정보 조회를 위해 ID만 추출
             List<Long> productIds = bestsellerPage.getContent().stream()
                     .map(OrderRepository.BestsellerProductProjection::getProductId)
                     .collect(Collectors.toList());
             log.debug("Found {} bestseller products: {}", productIds.size(), productIds);
 
-            // 4단계: 상품 상세 정보 일괄 조회 (translation: Step 4: Fetch product details in bulk)
+            // 4단계: 상품 상세 정보 일괄 조회
             ApiResponseDto<Map<Long, ProductResponseDto>> productsResponse =
                 productClient.getProductsByIdsPublic(productIds);
             if (productsResponse == null || productsResponse.getData() == null) {
@@ -1037,21 +1033,20 @@ public class OrderServiceImpl implements OrderService {
             Map<Long, ProductResponseDto> productMap = productsResponse.getData();
 
             // 5단계 (핵심 수정): 판매량 정보와 상품 상세 정보를 합쳐서 새로운 DTO 생성
-            // (translation: Step 5 (Key Change): Combine sales count data with product details to create the new DTO)
             List<BestsellerProductResponseDto> finalResult = bestsellerPage.getContent().stream()
                     .map(projection -> {
                         ProductResponseDto details = productMap.get(projection.getProductId());
                         if (details != null) {
                             return new BestsellerProductResponseDto(projection.getTotalQuantity(), details);
                         }
-                        return null; // 상세 정보가 없는 경우 제외 (translation: Exclude if details are missing)
+                        return null; // 상세 정보가 없는 경우 제외
                     })
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
             log.info("Successfully retrieved {} nearby bestseller products", finalResult.size());
 
-            // 6단계: 최종 결과를 Page 객체로 만들어 반환 (translation: Step 6: Create and return the final Page object)
+            // 6단계: 최종 결과를 Page 객체로 만들어 반환
             return new PageImpl<>(finalResult, pageable, bestsellerPage.getTotalElements());
 
         } catch (Exception e) {
