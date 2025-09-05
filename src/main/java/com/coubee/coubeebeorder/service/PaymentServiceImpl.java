@@ -16,6 +16,7 @@ import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.domain.repository.PaymentRepository;
 import com.coubee.coubeebeorder.kafka.producer.KafkaMessageProducer;
 import com.coubee.coubeebeorder.kafka.producer.notification.event.OrderNotificationEvent;
+import com.coubee.coubeebeorder.service.OrderPaidEvent;
 import com.coubee.coubeebeorder.remote.dto.PortoneWebhookPayload;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
 import com.coubee.coubeebeorder.remote.store.StoreResponseDto;
