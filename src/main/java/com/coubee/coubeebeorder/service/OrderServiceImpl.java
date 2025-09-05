@@ -999,8 +999,8 @@ public class OrderServiceImpl implements OrderService {
                 .map(row -> (String) row[0])
                 .collect(Collectors.toList());
 
-        // Call the NEW ASC-sorted details method.
-        List<Order> ordersWithDetails = orderRepository.findWithDetailsInAsc(orderIds);
+        // Call the DESC-sorted details method to maintain newest-first ordering.
+        List<Order> ordersWithDetails = orderRepository.findWithDetailsInDesc(orderIds);
         
         // Reuse the existing helper method to convert entities to DTOs.
         List<OrderDetailResponse> orderDetailResponses = convertToOrderDetailResponseList(ordersWithDetails);

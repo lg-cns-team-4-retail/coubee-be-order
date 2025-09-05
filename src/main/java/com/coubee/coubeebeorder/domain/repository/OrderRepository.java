@@ -620,10 +620,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                                                      LocalDateTime endDate,
                                                                      Pageable pageable);
 
-    // [ADD] New method to fetch store order IDs with keyword search, sorted by newest first.
+    // [MODIFIED] New method to fetch store order IDs with keyword search, sorted by newest first, EXCLUDING 'PENDING' status.
     @Query(value = "SELECT DISTINCT o.order_id, o.created_at " +
                    "FROM coubee_order.orders o " +
                    "WHERE o.store_id = :storeId " +
+                   "AND o.status != 'PENDING' " + // Exclude PENDING status
                    "AND (:status IS NULL OR o.status = :status) " +
                    "AND (" +
                    "    :keyword IS NULL OR :keyword = '' OR " +
@@ -642,6 +643,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            countQuery = "SELECT COUNT(DISTINCT o.order_id) " +
                         "FROM coubee_order.orders o " +
                         "WHERE o.store_id = :storeId " +
+                        "AND o.status != 'PENDING' " + // Exclude PENDING status in count query too
                         "AND (:status IS NULL OR o.status = :status) " +
                         "AND (" +
                         "    :keyword IS NULL OR :keyword = '' OR " +
@@ -661,15 +663,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                                @Param("keyword") String keyword,
                                                Pageable pageable);
 
-    // [ADD] New method to fetch full order details, sorted by oldest first.
+    // [RENAMED & MODIFIED] Fetches full order details for a given list of IDs, sorted by newest first.
     // 카테시안 곱 문제를 해결하기 위해 statusHistory에 대한 JOIN FETCH를 제거합니다.
     // (Removed JOIN FETCH on statusHistory to resolve the Cartesian Product issue.)
     @Query("SELECT DISTINCT o FROM Order o " +
            "LEFT JOIN FETCH o.items " +
            "LEFT JOIN FETCH o.payment " +
            "WHERE o.orderId IN :orderIds " +
-           "ORDER BY o.createdAt ASC") // Sort by oldest first
-    List<Order> findWithDetailsInAsc(@Param("orderIds") List<String> orderIds);
+           "ORDER BY o.createdAt DESC") // Sort by newest first
+    List<Order> findWithDetailsInDesc(@Param("orderIds") List<String> orderIds);
 
     // ========================================
     // Bestseller Products Query Methods
