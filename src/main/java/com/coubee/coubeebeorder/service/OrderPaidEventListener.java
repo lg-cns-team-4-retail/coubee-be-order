@@ -44,7 +44,7 @@ public class OrderPaidEventListener {
             if (ownerIdResponse != null && "OK".equals(ownerIdResponse.getCode()) && ownerIdResponse.getData() != null) {
                 Long ownerId = ownerIdResponse.getData();
                 OrderNotificationEvent forOwner = OrderNotificationEvent.createNewOrderNotificationForOwner(
-                        event.orderId(), ownerId, storeName);
+                        event.orderId(), ownerId, storeName, event.storeId());
                 kafkaMessageProducer.publishOrderNotificationEvent(forOwner);
                 log.info("점주에게 신규 주문 알림 발행 성공. Order: {}, Owner ID: {}", event.orderId(), ownerId); // (translation: Successfully published new order notification to owner. Order: {}, Owner ID: {})
             } else {
