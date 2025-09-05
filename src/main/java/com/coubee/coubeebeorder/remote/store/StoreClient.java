@@ -23,7 +23,7 @@ import java.util.Map;
 @FeignClient(
     name = "coubee-be-store-service",
     url = "http://coubee-be-store-service:8080",
-    configuration = com.coubee.coubeebeorder.config.EmptyFeignConfig.class 
+    configuration = com.coubee.coubeebeorder.config.FeignConfig.class 
 )
 public interface StoreClient {
 

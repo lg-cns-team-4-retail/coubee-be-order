@@ -124,12 +124,16 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public boolean handlePaymentWebhook(String webhookId, String signature, String timestamp, String requestBody) {
+        log.info("Received PortOne webhook. ID: '{}', Signature: '{}'", webhookId, signature);
+        
         String transactionId = "unknown";
         try {
             // 1. 웹훅 서명 검증
             if (!webhookVerifier.verifyWebhook(requestBody, webhookId, signature, timestamp)) {
+                log.warn("Webhook signature verification failed for webhook ID: {}", webhookId);
                 return false;
             }
+            log.info("Webhook signature verified successfully for webhook ID: {}", webhookId);
 
             // 2. 웹훅 ID 기반 멱등성 체크 - 데이터베이스에 저장 시도
             if (webhookId != null && !webhookId.isBlank()) {
@@ -163,7 +167,7 @@ public class PaymentServiceImpl implements PaymentService {
             // 웹훅 이벤트 타입에 따라 처리
             String eventType = payload.getType();
             if ("Transaction.Paid".equals(eventType)) {
-                log.info("Transaction.Paid 이벤트 처리 - 결제 완료 상태로 업데이트");
+                log.info("Processing 'Transaction.Paid' event for order (merchant_uid): {}, PortOne tx_id: {}", merchantUid, transactionId);
                 
                 // 1. Perform all DB updates first within this primary transaction.
                 Order order = orderRepository.findByOrderId(merchantUid)
@@ -187,7 +191,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.updatePgTransactionId(transactionId);
                 payment.updatePaidAt(LocalDateTime.now());
                 
-                log.info("주문 및 결제 상태 PAID로 업데이트 완료: {}", merchantUid); // (translation: Order and payment status updated to PAID:)
+                log.info("Order and payment status successfully updated to PAID for order: {}", merchantUid);
                 
                 // 2. After DB logic is complete, publish an event to notify the owner.
                 eventPublisher.publishEvent(new OrderPaidEvent(order.getOrderId(), order.getStoreId(), order.getUserId()));

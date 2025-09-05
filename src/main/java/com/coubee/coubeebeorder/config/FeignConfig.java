@@ -4,14 +4,12 @@ import feign.Logger;
 import feign.Request;
 import feign.codec.ErrorDecoder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 import java.util.concurrent.TimeUnit;
 
 /**
  * Feign client configuration for better error handling and timeout settings
  */
-@Configuration
 public class FeignConfig {
 
     /**
