@@ -180,13 +180,15 @@ public class OrderController {
     }
 
     // [ADD] New endpoint for store owners to view their orders.
-    @Operation(summary = "Get Store Orders", description = "Retrieves a paginated list of orders for a specific store, optionally filtered by status and sorted by oldest first. (Store Owner only)")
+    @Operation(summary = "Get Store Orders", description = "Retrieves a paginated list of orders for a specific store, optionally filtered by status and keyword, sorted by oldest first. (Store Owner only)")
     @GetMapping("/stores/{storeId}/orders")
     public ApiResponseDto<Page<OrderDetailResponse>> getStoreOrders(
             @Parameter(description = "ID of the store to retrieve orders for", required = true)
             @PathVariable Long storeId,
             @Parameter(description = "Filter orders by status (e.g., PAID, PREPARING, RECEIVED)")
             @RequestParam(required = false) OrderStatus status,
+            @Parameter(description = "Search keyword for store name, product name, or product description")
+            @RequestParam(required = false) String keyword,
             @Parameter(description = "Page number", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
@@ -196,7 +198,7 @@ public class OrderController {
         Long ownerUserId = GatewayRequestHeaderUtils.getUserIdOrThrowException();
         PageRequest pageRequest = PageRequest.of(page, size);
 
-        Page<OrderDetailResponse> response = orderService.getStoreOrders(ownerUserId, storeId, status, pageRequest);
+        Page<OrderDetailResponse> response = orderService.getStoreOrders(ownerUserId, storeId, status, keyword, pageRequest);
         return ApiResponseDto.readOk(response);
     }
 

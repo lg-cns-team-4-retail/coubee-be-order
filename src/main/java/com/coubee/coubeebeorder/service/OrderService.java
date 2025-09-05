@@ -63,7 +63,7 @@ public interface OrderService {
     StoreOrderSummaryResponseDto getStoreOrderSummary(Long ownerUserId, Long storeId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     // [ADD] New method signature for getting a store's orders.
-    Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, Pageable pageable);
+    Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, String keyword, Pageable pageable);
 
     /**
      * Get nearby bestseller products based on geographical coordinates

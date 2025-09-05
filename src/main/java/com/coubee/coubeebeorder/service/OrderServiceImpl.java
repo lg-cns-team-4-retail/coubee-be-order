@@ -977,25 +977,24 @@ public class OrderServiceImpl implements OrderService {
 
     // [ADD] Implementation for the new getStoreOrders method.
     @Override
-    public Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, Pageable pageable) {
-        log.info("Getting store orders - ownerId: {}, storeId: {}, status: {}, pageable: {}", ownerUserId, storeId, status, pageable);
+    public Page<OrderDetailResponse> getStoreOrders(Long ownerUserId, Long storeId, OrderStatus status, String keyword, Pageable pageable) {
+        log.info("Getting store orders - ownerId: {}, storeId: {}, status: {}, keyword: {}, pageable: {}", ownerUserId, storeId, status, keyword, pageable);
 
         // 1. Security Check: Verify the user owns the store.
         ApiResponseDto<List<Long>> ownedStoresResponse = storeClient.getStoresByOwnerIdOnApproved(ownerUserId);
         if (ownedStoresResponse.getData() == null || !ownedStoresResponse.getData().contains(storeId)) {
-            // (translation: You do not have permission to view orders for this store.)
-            throw new IllegalArgumentException("이 매장의 주문을 조회할 권한이 없습니다.");
+            throw new IllegalArgumentException("You do not have permission to access orders for this store.");
         }
 
-        // 2. Call the new repository method with ASC sorting.
+        // 2. Fetch paginated order IDs using the native query with keyword search.
         String statusString = (status == null) ? null : status.name();
-        Page<Object[]> orderDataPage = orderRepository.findStoreOrderIdsNativeAsc(storeId, statusString, pageable);
+        Page<Object[]> orderDataPage = orderRepository.findStoreOrderIdsNativeDesc(storeId, statusString, keyword, pageable);
 
         if (orderDataPage.isEmpty()) {
             return Page.empty(pageable);
         }
 
-        // 3. Use the two-step fetch pattern to avoid N+1 issues.
+        // 3. Extract order IDs from the Object[] results.
         List<String> orderIds = orderDataPage.getContent().stream()
                 .map(row -> (String) row[0])
                 .collect(Collectors.toList());

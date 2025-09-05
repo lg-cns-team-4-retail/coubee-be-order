@@ -620,21 +620,46 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                                                      LocalDateTime endDate,
                                                                      Pageable pageable);
 
-    // [ADD] New method to fetch store order IDs, sorted by oldest first.
+    // [ADD] New method to fetch store order IDs with keyword search, sorted by newest first.
     @Query(value = "SELECT DISTINCT o.order_id, o.created_at " +
                    "FROM coubee_order.orders o " +
                    "WHERE o.store_id = :storeId " +
                    "AND (:status IS NULL OR o.status = :status) " +
-                   "ORDER BY o.created_at ASC " + // Sort by oldest first
+                   "AND (" +
+                   "    :keyword IS NULL OR :keyword = '' OR " +
+                   "    LOWER(o.store_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                   "    EXISTS (" +
+                   "        SELECT 1 FROM coubee_order.order_items oi " +
+                   "        WHERE oi.order_id = o.order_id " +
+                   "        AND (" +
+                   "            LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                   "            LOWER(oi.description) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                   "        )" +
+                   "    )" +
+                   ") " +
+                   "ORDER BY o.created_at DESC " + // Sort by newest first
                    "LIMIT :#{#pageable.pageSize} OFFSET :#{#pageable.offset}",
            countQuery = "SELECT COUNT(DISTINCT o.order_id) " +
                         "FROM coubee_order.orders o " +
                         "WHERE o.store_id = :storeId " +
-                        "AND (:status IS NULL OR o.status = :status)",
+                        "AND (:status IS NULL OR o.status = :status) " +
+                        "AND (" +
+                        "    :keyword IS NULL OR :keyword = '' OR " +
+                        "    LOWER(o.store_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    EXISTS (" +
+                        "        SELECT 1 FROM coubee_order.order_items oi " +
+                        "        WHERE oi.order_id = o.order_id " +
+                        "        AND (" +
+                        "            LOWER(oi.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "            LOWER(oi.description) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+                        "        )" +
+                        "    )" +
+                        ")",
            nativeQuery = true)
-    Page<Object[]> findStoreOrderIdsNativeAsc(@Param("storeId") Long storeId,
-                                              @Param("status") String status,
-                                              Pageable pageable);
+    Page<Object[]> findStoreOrderIdsNativeDesc(@Param("storeId") Long storeId,
+                                               @Param("status") String status,
+                                               @Param("keyword") String keyword,
+                                               Pageable pageable);
 
     // [ADD] New method to fetch full order details, sorted by oldest first.
     // 카테시안 곱 문제를 해결하기 위해 statusHistory에 대한 JOIN FETCH를 제거합니다.
