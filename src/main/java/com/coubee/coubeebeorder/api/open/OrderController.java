@@ -46,7 +46,6 @@ public class OrderController {
 
     private final OrderService orderService;
     private final StoreSecurityService storeSecurityService;
-    private final UserServiceClient userServiceClient;
 
     @Operation(summary = "주문 생성", description = "새로운 주문을 생성하고 결제를 준비합니다")
     @PostMapping("/orders")
@@ -227,11 +226,11 @@ public class OrderController {
             throw new IllegalArgumentException("Order not found for this store");
         }
 
-        // OpenFeign 클라이언트를 사용하여 사용자 정보를 조회합니다.
-        ApiResponseDto<SiteUserInfoDto> userResponse = userServiceClient.getUserInfoById(orderDetail.getUserId());
+        // OrderService의 Circuit Breaker가 적용된 메소드를 사용하여 사용자 정보를 조회합니다.
+        SiteUserInfoDto userInfo = orderService.getUserData(orderDetail.getUserId());
 
         // User 서비스로부터 받은 SiteUserInfoDto를 직접 사용하여 DTO를 변환합니다.
-        OrderDetailResponseDto responseDto = convertToOrderDetailResponseDto(orderDetail, userResponse.getData());
+        OrderDetailResponseDto responseDto = convertToOrderDetailResponseDto(orderDetail, userInfo);
 
         return ApiResponseDto.<OrderDetailResponseDto>builder()
                 .code("OK")

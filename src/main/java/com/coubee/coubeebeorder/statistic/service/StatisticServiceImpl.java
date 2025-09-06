@@ -2,8 +2,10 @@ package com.coubee.coubeebeorder.statistic.service;
 
 import com.coubee.coubeebeorder.common.dto.ApiResponseDto;
 import com.coubee.coubeebeorder.common.exception.ApiError;
+import com.coubee.coubeebeorder.common.exception.StoreServiceException;
 import com.coubee.coubeebeorder.domain.repository.OrderRepository;
 import com.coubee.coubeebeorder.remote.store.StoreClient;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import com.coubee.coubeebeorder.statistic.dto.DailyStatisticResponseDto;
 import com.coubee.coubeebeorder.statistic.dto.MonthlyStatisticResponseDto;
 import com.coubee.coubeebeorder.statistic.dto.ProductSalesSummaryDto;
@@ -37,6 +39,7 @@ public class StatisticServiceImpl implements StatisticService {
      * Validate store access for the given user
      * Checks if the user owns the store and if the store is approved
      */
+    @CircuitBreaker(name = "downstreamServices", fallbackMethod = "validateStoreAccessFallback")
     private void validateStoreAccess(Long userId, Long storeId) {
         if (storeId == null) {
             return; // 시스템 전체 통계는 매장 검증이 필요하지 않음
@@ -61,21 +64,25 @@ public class StatisticServiceImpl implements StatisticService {
                 throw new ApiError("Access denied: Store is not approved");
             }
             */
+        } catch (IllegalArgumentException e) {
+            // 권한 예외는 그대로 다시 던져서 403을 유도합니다.
+            throw e;
         } catch (Exception e) {
-            if (e instanceof ApiError) {
-                throw e;
-            }
+            // FeignException 등 통신 오류는 여기서 잡힙니다.
             log.error("Error validating store access for userId: {}, storeId: {}", userId, storeId, e);
-            throw new ApiError("Unable to validate store access");
+            // 더 명확한 서비스 장애 예외를 던집니다.
+            throw new StoreServiceException("Unable to validate store access due to a dependent service issue.");
         }
     }
 
-
-
-
-
-
-
+    /**
+     * validateStoreAccess의 폴백 메소드
+     */
+    private void validateStoreAccessFallback(Long userId, Long storeId, Exception ex) {
+        log.warn("Circuit breaker for validateStoreAccess is open. userId: {}, storeId: {}. Error: {}", userId, storeId, ex.getMessage());
+        // Store 서비스 장애 시, 명확한 예외를 던져 사용자에게 알립니다.
+        throw new StoreServiceException("매장 정보를 조회하는 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.");
+    }
 
     /**
      * Calculate percentage change between current and previous values

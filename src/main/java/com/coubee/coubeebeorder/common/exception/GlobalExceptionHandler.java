@@ -75,6 +75,42 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    @ExceptionHandler(StoreServiceException.class)
+    public ResponseEntity<ApiResponseDto<Object>> handleStoreServiceException(StoreServiceException ex) {
+        log.error("Store service communication error: {}", ex.getMessage());
+        
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("timestamp", LocalDateTime.now());
+        errorDetails.put("cause", "Store Service");
+
+        ApiResponseDto<Object> response = ApiResponseDto.createError(
+            "SERVICE_UNAVAILABLE",
+            "매장 서비스와의 통신 중 오류가 발생했습니다: " + ex.getMessage(),
+            errorDetails
+        );
+        
+        // 503 Service Unavailable 상태 코드를 반환하여 서비스 장애임을 명확히 합니다.
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
+    @ExceptionHandler(UserServiceException.class)
+    public ResponseEntity<ApiResponseDto<Object>> handleUserServiceException(UserServiceException ex) {
+        log.error("User service communication error: {}", ex.getMessage());
+        
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("timestamp", LocalDateTime.now());
+        errorDetails.put("cause", "User Service");
+
+        ApiResponseDto<Object> response = ApiResponseDto.createError(
+            "SERVICE_UNAVAILABLE",
+            "사용자 서비스와의 통신 중 오류가 발생했습니다: " + ex.getMessage(),
+            errorDetails
+        );
+        
+        // 503 Service Unavailable 상태 코드를 반환하여 서비스 장애임을 명확히 합니다.
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponseDto<Object>> handleGenericException(Exception ex) {
         log.error("Unexpected error: ", ex);

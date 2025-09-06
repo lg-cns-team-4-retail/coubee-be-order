@@ -851,6 +851,28 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
+     * 개별 사용자 데이터 조회 (Circuit Breaker 적용)
+     */
+    @CircuitBreaker(name = "downstreamServices", fallbackMethod = "getUserDataFallback")
+    public SiteUserInfoDto getUserData(Long userId) {
+        try {
+            ApiResponseDto<SiteUserInfoDto> response = userServiceClient.getUserInfoById(userId);
+            return response.getData();
+        } catch (Exception e) {
+            log.warn("Failed to fetch user data for userId: {}. Using fallback.", userId, e);
+            throw e; // Circuit Breaker가 처리하도록 예외를 다시 던짐
+        }
+    }
+
+    /**
+     * 개별 사용자 데이터 조회 실패 시 폴백 메서드
+     */
+    private SiteUserInfoDto getUserDataFallback(Long userId, Exception ex) {
+        log.warn("User data fetch failed for userId: {}, using fallback data", userId, ex);
+        return createFallbackUserData(userId);
+    }
+
+    /**
      * 폴백 사용자 데이터 생성
      */
     private SiteUserInfoDto createFallbackUserData(Long userId) {

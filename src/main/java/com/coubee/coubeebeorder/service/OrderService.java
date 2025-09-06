@@ -13,6 +13,7 @@ import com.coubee.coubeebeorder.domain.dto.StoreOrderSummaryResponseDto;
 import com.coubee.coubeebeorder.domain.dto.UserOrderSummaryDto;
 import com.coubee.coubeebeorder.domain.dto.BestsellerProductResponseDto;
 import com.coubee.coubeebeorder.remote.product.ProductResponseDto;
+import com.coubee.coubeebeorder.remote.user.SiteUserInfoDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -74,4 +75,12 @@ public interface OrderService {
      * @return 주변 매장의 베스트셀러 상품 페이지네이션 목록
      */
     Page<BestsellerProductResponseDto> getNearbyBestsellers(double latitude, double longitude, Pageable pageable);
+
+    /**
+     * Circuit Breaker가 적용된 개별 사용자 데이터 조회
+     *
+     * @param userId 조회할 사용자 ID
+     * @return 사용자 정보 (실패 시 폴백 데이터)
+     */
+    SiteUserInfoDto getUserData(Long userId);
 }
