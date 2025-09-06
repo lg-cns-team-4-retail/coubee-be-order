@@ -881,14 +881,27 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public UserOrderSummaryDto getUserOrderSummary(Long userId) {
-        log.info("Getting user order summary for userId: {}", userId);
+        // DB에서 실제 데이터를 조회하는 로직
+        Optional<UserOrderSummaryProjection> projectionOpt = orderRepository.findUserOrderSummary(userId);
 
-        // 현재는 0값을 반환하는 간단한 구현
+        if (projectionOpt.isEmpty()) {
+            // 주문이 없을 경우 0으로 반환
+            return UserOrderSummaryDto.builder()
+                    .totalOrderCount(0L)
+                    .totalOriginalAmount(0L)
+                    .totalDiscountAmount(0L)
+                    .finalPurchaseAmount(0L)
+                    .build();
+        }
+
+        UserOrderSummaryProjection projection = projectionOpt.get();
+        
+        // 조회된 실제 데이터를 바탕으로 DTO를 만들어 반환
         return UserOrderSummaryDto.builder()
-                .totalOrderCount(0L)
-                .totalOriginalAmount(0L)
-                .totalDiscountAmount(0L)
-                .finalPurchaseAmount(0L)
+                .totalOrderCount(projection.getTotalOrderCount())
+                .totalOriginalAmount(projection.getTotalOriginalAmount())
+                .totalDiscountAmount(projection.getTotalDiscountAmount())
+                .finalPurchaseAmount(projection.getFinalPurchaseAmount())
                 .build();
     }
 
