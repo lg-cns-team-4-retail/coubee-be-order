@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 @FeignClient(
     name = "coubee-be-user-service",
     url = "http://coubee-be-user-service:8080",
-    configuration = {com.coubee.coubeebeorder.config.FeignConfig.class, com.coubee.coubeebeorder.config.UserClientErrorDecoder.class}
+    configuration = com.coubee.coubeebeorder.config.UserFeignConfig.class
 )
 public interface UserServiceClient {
 
