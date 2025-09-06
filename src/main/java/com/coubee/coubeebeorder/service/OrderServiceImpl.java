@@ -896,12 +896,15 @@ public class OrderServiceImpl implements OrderService {
 
         UserOrderSummaryProjection projection = projectionOpt.get();
         
+        // finalPurchaseAmount는 totalOriginalAmount - totalDiscountAmount로 계산
+        Long finalPurchaseAmount = projection.getTotalOriginalAmount() - projection.getTotalDiscountAmount();
+        
         // 조회된 실제 데이터를 바탕으로 DTO를 만들어 반환
         return UserOrderSummaryDto.builder()
                 .totalOrderCount(projection.getTotalOrderCount())
                 .totalOriginalAmount(projection.getTotalOriginalAmount())
                 .totalDiscountAmount(projection.getTotalDiscountAmount())
-                .finalPurchaseAmount(projection.getFinalPurchaseAmount())
+                .finalPurchaseAmount(finalPurchaseAmount)
                 .build();
     }
 
