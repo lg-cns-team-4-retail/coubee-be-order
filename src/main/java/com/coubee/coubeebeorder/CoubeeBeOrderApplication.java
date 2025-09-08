@@ -7,11 +7,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableFeignClients
 @EnableJpaAuditing
 @EnableKafka
+@EnableScheduling
 @OpenAPIDefinition(
         info = @Info(
                 title = "Coubee Order Service API",

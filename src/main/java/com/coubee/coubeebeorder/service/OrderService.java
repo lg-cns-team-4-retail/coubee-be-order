@@ -83,4 +83,11 @@ public interface OrderService {
      * @return 사용자 정보 (실패 시 폴백 데이터)
      */
     SiteUserInfoDto getUserData(Long userId);
+
+    /**
+     * 오래된 PENDING 상태의 주문들을 자동으로 취소합니다 (스케줄러용)
+     * 15분 이상 PENDING 상태로 남아있는 주문들을 FAILED로 변경하고 재고를 복원합니다.
+     * 이는 "ghost stock" 정리 프로세스입니다.
+     */
+    void cancelStalePendingOrders();
 }

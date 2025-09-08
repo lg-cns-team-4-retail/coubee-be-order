@@ -1092,4 +1092,33 @@ public class OrderServiceImpl implements OrderService {
             return Page.empty(pageable);
         }
     }
+
+    @Override
+    @Transactional
+    public void cancelStalePendingOrders() {
+        // 1. Set the cutoff time (e.g., 15 minutes before the current time)
+        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(15);
+
+        // 2. Find all target stale orders
+        List<Order> staleOrders = orderRepository.findStalePendingOrders(cutoffTime);
+
+        if (staleOrders.isEmpty()) {
+            log.info("No stale pending orders to clean up.");
+            return;
+        }
+
+        log.warn("Automatically cancelling {} stale pending orders.", staleOrders.size());
+
+        // 3. For each stale order, mark as 'FAILED' and publish a stock restoration event
+        for (Order order : staleOrders) {
+            // 3-1. Change order status to 'FAILED' and record history
+            updateOrderStatusAndCreateHistory(order, OrderStatus.FAILED);
+
+            // 3-2. Publish a Kafka event to restore the pre-allocated stock
+            // The increaseStock method in ProductStockServiceImpl publishes the Kafka event
+            productStockService.increaseStock(order);
+
+            log.info("Order ID '{}' has been automatically cancelled, and a stock restoration event has been published.", order.getOrderId());
+        }
+    }
 }

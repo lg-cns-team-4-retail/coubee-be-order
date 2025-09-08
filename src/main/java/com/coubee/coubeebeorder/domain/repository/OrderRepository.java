@@ -713,4 +713,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         """,
         nativeQuery = true)
     Page<BestsellerProductProjection> findBestsellersByStoreIds(@Param("storeIds") List<Long> storeIds, Pageable pageable);
+
+    // ========================================
+    // Pending Order Cleanup Query Methods
+    // ========================================
+
+    /**
+     * Find stale pending orders that have been in PENDING status for longer than the cutoff time
+     * Used by the OrderCleanupScheduler to identify orders that need to be automatically cancelled
+     *
+     * @param cutoffTime the cutoff time - orders created before this time will be considered stale
+     * @return list of stale pending orders
+     */
+    @Query("SELECT o FROM Order o WHERE o.status = 'PENDING' AND o.createdAt < :cutoffTime")
+    List<Order> findStalePendingOrders(@Param("cutoffTime") LocalDateTime cutoffTime);
 }
